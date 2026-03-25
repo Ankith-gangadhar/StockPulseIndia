@@ -151,3 +151,4 @@ D:\Bloomberg Terminal Stock\StockPulseIndia\StockPulse.Api\obj\Debug\net9.0\refi
 D:\Bloomberg Terminal Stock\StockPulseIndia\StockPulse.Api\obj\Debug\net9.0\StockPulse.Api.pdb
 D:\Bloomberg Terminal Stock\StockPulseIndia\StockPulse.Api\obj\Debug\net9.0\StockPulse.Api.genruntimeconfig.cache
 D:\Bloomberg Terminal Stock\StockPulseIndia\StockPulse.Api\obj\Debug\net9.0\ref\StockPulse.Api.dll
+D:\Bloomberg Terminal Stock\StockPulseIndia\StockPulse.Api\obj\Debug\net9.0\StockPulse.Api.sourcelink.json
