@@ -1,25 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from './store';
 import { setStocks, setConnectionStatus } from './features/stockSlice';
 import { fetchDashboardData } from './features/dashboardSlice';
 import GridLayout from 'react-grid-layout';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 const API_BASE = 'http://localhost:5200';
-const AnyGridLayout = GridLayout as any;
 const MAX_CHARTS = 10;
 const TIMEFRAMES = ['15m', '1h', '6h', '1d', '1w', '1m', '6m', '1y', '3y', '5y'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
+const AnyGridLayout = GridLayout as any;
+
+type Suggestion = {
+  symbol: string;
+  name: string;
+  tradingViewSymbol: string;
+};
 
 type ChartTab = {
   id: string;
   symbol: string;
   title: string;
+  tradingViewSymbol: string;
   timeframe: Timeframe;
+  embedUrl: string;
+  fullChartUrl: string;
 };
 
 const WATCHLIST_SEED = [
@@ -27,7 +35,6 @@ const WATCHLIST_SEED = [
   { symbol: 'HDFCBANK', name: 'HDFC Bank', target: '1560', thesis: 'Loan growth remains resilient with improving NIM trend.' },
   { symbol: 'TCS', name: 'Tata Consultancy Services', target: '3950', thesis: 'Order pipeline and rupee weakness can aid margins.' },
   { symbol: 'INFY', name: 'Infosys', target: '1725', thesis: 'Large-deal wins and valuation support after correction.' },
-  { symbol: 'LT', name: 'Larsen & Toubro', target: '4050', thesis: 'Capex cycle and strong execution pipeline.' },
 ];
 
 const BUY_TODAY = [
@@ -42,54 +49,30 @@ const FALLEN_STOCKS = [
   { symbol: 'WIPRO', down: '-3.3%', note: 'IT outlook jitters after cautious management commentary.' },
 ];
 
-const TRADER_INDEXES = [
-  { name: 'NIFTY 50', value: '24,850', change: '+0.42%' },
-  { name: 'SENSEX', value: '81,420', change: '+0.38%' },
-  { name: 'BANK NIFTY', value: '53,780', change: '-0.24%' },
-  { name: 'NIFTY FIN SERVICE', value: '24,215', change: '-0.18%' },
-  { name: 'NIFTY IT', value: '37,940', change: '+0.96%' },
-  { name: 'NIFTY MIDCAP 100', value: '56,480', change: '+0.21%' },
-];
-
-const RISK_CHECKLIST = [
-  'Track RBI policy commentary and bond yields before taking leveraged positions.',
-  'Avoid averaging blindly in stocks breaking multi-week support with high volume.',
-  'Keep stop-loss and position sizing fixed before market open.',
-  'Watch FII and DII flows after 2:30 PM for late-session trend reversals.',
-];
-
-const CRITICAL_NEWS = [
-  { tag: 'Macro', title: 'US CPI print this week may alter global rate-cut expectations.', impact: 'High Impact' },
-  { tag: 'Policy', title: 'Potential changes in crude import duty can affect OMC profitability.', impact: 'High Impact' },
-  { tag: 'Currency', title: 'Rupee volatility near 84 may pressure import-heavy sectors.', impact: 'Medium Impact' },
-  { tag: 'Earnings', title: 'Large-cap banking earnings due next week; sentiment pivot likely.', impact: 'High Impact' },
-];
-
-const MOCK_CHART_POINTS = [22, 24, 23, 25, 27, 26, 29, 31, 30, 33, 35, 34];
 const makeChartId = () => `chart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+const initialLayout = [
+  { i: 'quotes', x: 0, y: 0, w: 3, h: 5, minW: 2, minH: 3 },
+  { i: 'chart', x: 3, y: 0, w: 6, h: 7, minW: 4, minH: 4 },
+  { i: 'insights', x: 9, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'news', x: 9, y: 3, w: 3, h: 4, minW: 2, minH: 2 },
+  { i: 'watchlist', x: 0, y: 5, w: 4, h: 4, minW: 3, minH: 3 },
+  { i: 'buytoday', x: 4, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
+  { i: 'fallen', x: 8, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
+];
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
   const { stocks, status } = useSelector((state: RootState) => state.stock);
   const { insights, news, loading } = useSelector((state: RootState) => state.dashboard);
+
   const [chartQuery, setChartQuery] = useState('');
-  const [chartTabs, setChartTabs] = useState<ChartTab[]>([
-    { id: makeChartId(), symbol: 'NIFTY 50', title: 'NIFTY 50 Index', timeframe: '1d' },
-  ]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [layout, setLayout] = useState<any>([
-    { i: 'quotes', x: 0, y: 0, w: 3, h: 5 },
-    { i: 'chart', x: 3, y: 0, w: 6, h: 6 },
-    { i: 'insights', x: 9, y: 0, w: 3, h: 3 },
-    { i: 'news', x: 9, y: 3, w: 3, h: 3 },
-    { i: 'watchlist', x: 0, y: 5, w: 4, h: 4 },
-    { i: 'buytoday', x: 4, y: 6, w: 4, h: 3 },
-    { i: 'fallen', x: 8, y: 6, w: 4, h: 3 },
-    { i: 'indexes', x: 0, y: 9, w: 6, h: 3 },
-    { i: 'risk', x: 6, y: 9, w: 3, h: 3 },
-    { i: 'criticalNews', x: 9, y: 9, w: 3, h: 3 },
-  ]);
-  const [gridWidth, setGridWidth] = useState(Math.max(1200, window.innerWidth - 20));
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
+  const [chartTabs, setChartTabs] = useState<ChartTab[]>([]);
+  const [layout, setLayout] = useState(initialLayout);
+  const [gridWidth, setGridWidth] = useState(Math.max(1200, window.innerWidth - 24));
 
   useEffect(() => {
     dispatch(fetchDashboardData());
@@ -104,118 +87,112 @@ function App() {
       dispatch(setStocks(updatedStocks));
     });
 
-    connection
-      .start()
-      .then(() => {
-        dispatch(setConnectionStatus('connected'));
-      })
-      .catch(() => {
-        dispatch(setConnectionStatus('error'));
-      });
+    connection.start()
+      .then(() => dispatch(setConnectionStatus('connected')))
+      .catch(() => dispatch(setConnectionStatus('error')));
 
-    return () => {
-      connection.stop();
-    };
+    return () => { connection.stop(); };
   }, [dispatch]);
 
   useEffect(() => {
-    const onResize = () => setGridWidth(Math.max(1200, window.innerWidth - 20));
+    const onResize = () => setGridWidth(Math.max(1200, window.innerWidth - 24));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const symbolOptions = useMemo(() => {
-    const stockSymbols = stocks.map((s) => ({
-      symbol: s.symbol,
-      title: s.name || s.symbol,
-      tvSymbol: `NSE:${s.symbol}`,
-    }));
-    return [
-      ...stockSymbols,
-      { symbol: 'NIFTY 50', title: 'NIFTY 50 Index', tvSymbol: 'NSE:NIFTY' },
-      { symbol: 'SENSEX', title: 'BSE SENSEX', tvSymbol: 'BSE:SENSEX' },
-      { symbol: 'BANK NIFTY', title: 'NIFTY Bank Index', tvSymbol: 'NSE:BANKNIFTY' },
-      { symbol: 'RELIANCE', title: 'Reliance Industries', tvSymbol: 'NSE:RELIANCE' },
-      { symbol: 'TCS', title: 'Tata Consultancy Services', tvSymbol: 'NSE:TCS' },
-      { symbol: 'HDFCBANK', title: 'HDFC Bank', tvSymbol: 'NSE:HDFCBANK' },
-      { symbol: 'INFY', title: 'Infosys', tvSymbol: 'NSE:INFY' },
-      { symbol: 'ITC', title: 'ITC Ltd', tvSymbol: 'NSE:ITC' },
-    ];
-  }, [stocks]);
+  useEffect(() => {
+    const timeout = setTimeout(async () => {
+      setIsLoadingSuggestions(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/market/symbols?query=${encodeURIComponent(chartQuery.trim())}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }, 200);
 
-  const filteredSymbolOptions = useMemo(() => {
-    const query = chartQuery.trim().toUpperCase();
-    if (!query) return symbolOptions.slice(0, 8);
+    return () => clearTimeout(timeout);
+  }, [chartQuery]);
 
-    return symbolOptions
-      .filter(
-        (option) =>
-          option.symbol.toUpperCase().includes(query) ||
-          option.title.toUpperCase().includes(query),
-      )
-      .slice(0, 8);
-  }, [chartQuery, symbolOptions]);
+  useEffect(() => {
+    const seedDefaultChart = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/market/chart-config?symbol=NIFTY 50&timeframe=1d`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setChartTabs([
+          {
+            id: makeChartId(),
+            symbol: data.symbol,
+            title: data.name,
+            tradingViewSymbol: data.tradingViewSymbol,
+            timeframe: '1d',
+            embedUrl: data.embedUrl,
+            fullChartUrl: data.fullChartUrl,
+          },
+        ]);
+      } catch {
+        setChartTabs([]);
+      }
+    };
+    seedDefaultChart();
+  }, []);
 
-  const addChartTab = () => {
-    if (chartTabs.length >= MAX_CHARTS) return;
-    const query = chartQuery.trim().toUpperCase();
-    if (!query) return;
+  const addChartTab = async () => {
+    if (!selectedSuggestion || chartTabs.length >= MAX_CHARTS) return;
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/market/chart-config?symbol=${encodeURIComponent(selectedSuggestion.symbol)}&timeframe=1d`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setChartTabs((prev) => [
+        ...prev,
+        {
+          id: makeChartId(),
+          symbol: data.symbol,
+          title: data.name,
+          tradingViewSymbol: data.tradingViewSymbol,
+          timeframe: '1d',
+          embedUrl: data.embedUrl,
+          fullChartUrl: data.fullChartUrl,
+        },
+      ]);
+      setChartQuery('');
+      setSelectedSuggestion(null);
+      setShowSuggestions(false);
+    } catch {
+      // No-op fallback
+    }
+  };
 
-    const match = symbolOptions.find(
-      (option) => option.symbol.toUpperCase() === query || option.title.toUpperCase().includes(query),
-    );
-    if (!match) return;
-
-    setChartTabs((prev) => [
-      ...prev,
-      { id: makeChartId(), symbol: match.symbol, title: match.title, timeframe: '1d' },
-    ]);
-    setChartQuery('');
-    setShowSuggestions(false);
+  const setTabTimeframe = async (id: string, timeframe: Timeframe) => {
+    const tab = chartTabs.find((t) => t.id === id);
+    if (!tab) return;
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/market/chart-config?symbol=${encodeURIComponent(tab.symbol)}&timeframe=${timeframe}`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setChartTabs((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, timeframe, embedUrl: data.embedUrl, fullChartUrl: data.fullChartUrl }
+            : item,
+        ),
+      );
+    } catch {
+      // No-op fallback
+    }
   };
 
   const removeChartTab = (id: string) => {
     setChartTabs((prev) => prev.filter((tab) => tab.id !== id));
-  };
-
-  const setTabTimeframe = (id: string, timeframe: Timeframe) => {
-    setChartTabs((prev) => prev.map((tab) => (tab.id === id ? { ...tab, timeframe } : tab)));
-  };
-
-  const selectSuggestion = (symbol: string) => {
-    setChartQuery(symbol);
-    setShowSuggestions(false);
-  };
-
-  const generateLineData = (tab: ChartTab) => {
-    const base = Math.max(100, stocks.find((stock) => stock.symbol === tab.symbol)?.price ?? 24500);
-    const labels = ['09:15', '10:00', '10:45', '11:30', '12:15', '13:00', '13:45', '14:30', '15:15'];
-
-    return labels.map((label, index) => {
-      const factor = MOCK_CHART_POINTS[index % MOCK_CHART_POINTS.length] / 100;
-      const value = Number((base * (0.985 + factor * 0.03)).toFixed(2));
-      return { label, value };
-    });
-  };
-
-  const timeframeToTradingViewInterval: Record<Timeframe, string> = {
-    '15m': '15',
-    '1h': '60',
-    '6h': '240',
-    '1d': 'D',
-    '1w': 'W',
-    '1m': 'M',
-    '6m': 'M',
-    '1y': 'W',
-    '3y': 'W',
-    '5y': 'M',
-  };
-
-  const getTradingViewUrl = (symbol: string, timeframe: Timeframe) => {
-    const symbolData = symbolOptions.find((item) => item.symbol === symbol);
-    const tvSymbol = symbolData?.tvSymbol ?? `NSE:${symbol}`;
-    const interval = timeframeToTradingViewInterval[timeframe];
-    return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}&interval=${interval}`;
   };
 
   return (
@@ -241,15 +218,16 @@ function App() {
       <div className="p-2">
         <AnyGridLayout
           layout={layout}
-          onLayoutChange={(nextLayout: any) => setLayout(nextLayout)}
+          onLayoutChange={(next: any) => setLayout(next)}
           cols={12}
-          rowHeight={80}
           width={gridWidth}
+          rowHeight={80}
           margin={[8, 8]}
           containerPadding={[4, 4]}
           isResizable
           resizeHandles={['se']}
           draggableHandle=".drag-handle"
+          useCSSTransforms
         >
           <div key="quotes" className="bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
             <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
@@ -290,6 +268,7 @@ function App() {
                   onFocus={() => setShowSuggestions(true)}
                   onChange={(e) => {
                     setChartQuery(e.target.value);
+                    setSelectedSuggestion(null);
                     setShowSuggestions(true);
                   }}
                   onKeyDown={(e) => {
@@ -301,28 +280,34 @@ function App() {
                 />
                 <button
                   onClick={addChartTab}
-                  disabled={chartTabs.length >= MAX_CHARTS}
+                  disabled={chartTabs.length >= MAX_CHARTS || !selectedSuggestion}
                   className="px-3 py-1 text-xs font-bold rounded border border-neonAmber/40 text-neonAmber disabled:text-gray-500 disabled:border-gray-700"
                 >
                   Add Chart
                 </button>
-                {showSuggestions && filteredSymbolOptions.length > 0 && (
+                {showSuggestions && (
                   <div className="absolute left-0 right-24 top-8 z-20 bg-gray-950 border border-gray-700 rounded-md max-h-44 overflow-y-auto">
-                    {filteredSymbolOptions.map((option) => (
+                    {isLoadingSuggestions && <div className="px-2 py-2 text-[10px] text-gray-500">Loading symbols...</div>}
+                    {!isLoadingSuggestions && suggestions.length === 0 && <div className="px-2 py-2 text-[10px] text-neonRed">No symbol matches found.</div>}
+                    {!isLoadingSuggestions && suggestions.map((option) => (
                       <button
-                        key={`${option.symbol}-${option.tvSymbol}`}
-                        onClick={() => selectSuggestion(option.symbol)}
+                        key={`${option.symbol}-${option.tradingViewSymbol}`}
+                        onClick={() => {
+                          setChartQuery(option.symbol);
+                          setSelectedSuggestion(option);
+                          setShowSuggestions(false);
+                        }}
                         className="w-full text-left px-2 py-1.5 hover:bg-white/10 border-b border-gray-800 last:border-b-0"
                       >
                         <div className="text-xs text-white">{option.symbol}</div>
-                        <div className="text-[10px] text-gray-500">{option.title}</div>
+                        <div className="text-[10px] text-gray-500">{option.name}</div>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              {chartQuery && filteredSymbolOptions.length === 0 && (
-                <div className="text-[10px] text-neonRed mt-1">No matching symbol found. Please select from suggestions.</div>
+              {chartQuery && !selectedSuggestion && !isLoadingSuggestions && (
+                <div className="text-[10px] text-neonRed mt-1">Please select one symbol from suggestions.</div>
               )}
               <div className="text-[10px] text-gray-500 mt-1">
                 Suggestions only. Powered for Indian symbols (NSE/BSE mapping).
@@ -356,37 +341,20 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <div className="h-44 w-full bg-gradient-to-b from-gray-900 to-gray-950 rounded border border-gray-800 p-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={generateLineData(tab)}>
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                        <YAxis hide domain={['dataMin - 30', 'dataMax + 30']} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: '#0f172a',
-                            border: '1px solid #334155',
-                            borderRadius: '8px',
-                            fontSize: '11px',
-                          }}
-                          formatter={(value) => [`Rs ${Number(value ?? 0).toFixed(2)}`, tab.symbol]}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#f59e0b"
-                          strokeWidth={2}
-                          dot={false}
-                          activeDot={{ r: 3, fill: '#22c55e' }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div className="h-56 w-full rounded border border-gray-800 overflow-hidden">
+                    <iframe
+                      title={`${tab.symbol}-${tab.timeframe}`}
+                      src={tab.embedUrl}
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="mt-1 flex justify-between items-center gap-2">
                     <span className="text-[10px] text-gray-500">
                       View: {tab.timeframe} line chart
                     </span>
                     <a
-                      href={getTradingViewUrl(tab.symbol, tab.timeframe)}
+                      href={tab.fullChartUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[10px] text-neonAmber hover:text-neonGreen"
@@ -450,51 +418,6 @@ function App() {
                     <span className="text-[10px] text-neonRed">{item.down}</span>
                   </div>
                   <div className="text-[10px] text-gray-300 mt-1">{item.note}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div key="indexes" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Indexes Traders Track</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-2">
-              {TRADER_INDEXES.map((idx) => (
-                <div key={idx.name} className="border border-gray-800 rounded p-2">
-                  <div className="text-[10px] text-gray-500">{idx.name}</div>
-                  <div className="text-sm font-bold text-white">{idx.value}</div>
-                  <div className={`text-[10px] font-bold ${idx.change.startsWith('-') ? 'text-neonRed' : 'text-neonGreen'}`}>{idx.change}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div key="risk" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Things To Keep In Mind</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {RISK_CHECKLIST.map((item, idx) => (
-                <div key={idx} className="text-[10px] text-gray-300 border-l-2 border-neonAmber/40 pl-2">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div key="criticalNews" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Critical Future News</span>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {CRITICAL_NEWS.map((item, idx) => (
-                <div key={idx} className="border border-gray-800 rounded p-2">
-                  <div className="flex justify-between">
-                    <span className="text-[10px] text-neonAmber">{item.tag}</span>
-                    <span className="text-[9px] text-neonRed">{item.impact}</span>
-                  </div>
-                  <div className="text-[10px] text-gray-200 mt-1">{item.title}</div>
                 </div>
               ))}
             </div>
