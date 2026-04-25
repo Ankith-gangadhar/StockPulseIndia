@@ -3,6 +3,7 @@ using StockPulse.Api.Data;
 using Hangfire;
 using Hangfire.PostgreSql;
 using StackExchange.Redis;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,21 +16,39 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<StockPulseDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Configure Redis
-var redisConfiguration = builder.Configuration.GetConnectionString("RedisConnection") ?? "localhost:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConfiguration));
+// Redis and Hangfire are optional for local development. Keep APIs up even when infra is down.
+var redisConnectionString = builder.Configuration.GetConnectionString("RedisConnection");
+IConnectionMultiplexer? redisMultiplexer = null;
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    try
+    {
+        var redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+        redisOptions.AbortOnConnectFail = false;
+        redisMultiplexer = ConnectionMultiplexer.Connect(redisOptions);
+        builder.Services.AddSingleton(redisMultiplexer);
+    }
+    catch
+    {
+        // App should still start for API endpoints that do not require Redis.
+    }
+}
 
 // Configure SignalR
 builder.Services.AddSignalR();
 
-// Configure Hangfire with PostgreSQL
-builder.Services.AddHangfire(config => config
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UsePostgreSqlStorage(c => c.UseNpgsqlConnection(connectionString)));
+var hangfireEnabled = IsPostgresReachable(connectionString);
+if (hangfireEnabled)
+{
+    // Configure Hangfire with PostgreSQL
+    builder.Services.AddHangfire(config => config
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(c => c.UseNpgsqlConnection(connectionString)));
 
-builder.Services.AddHangfireServer();
+    builder.Services.AddHangfireServer();
+}
 
 // Add CORS for React frontend
 builder.Services.AddCors(options =>
@@ -58,11 +77,54 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StockPulse.Api.Hubs.StockHub>("/stockHub");
 
-// Configure Hangfire Dashboard (optional, useful for debugging)
-app.UseHangfireDashboard("/hangfire");
+if (hangfireEnabled)
+{
+    // Configure Hangfire Dashboard (optional, useful for debugging)
+    app.UseHangfireDashboard("/hangfire");
 
-// Enqueue Background Jobs
-// This runs every 1 minute
-RecurringJob.AddOrUpdate<StockPulse.Api.Jobs.StockUpdateJob>("UpdateStocks", job => job.UpdateStockPrices(), "* * * * *");
+    if (redisMultiplexer is not null)
+    {
+        // Enqueue Background Jobs
+        // This runs every 1 minute
+        RecurringJob.AddOrUpdate<StockPulse.Api.Jobs.StockUpdateJob>("UpdateStocks", job => job.UpdateStockPrices(), "* * * * *");
+    }
+    else
+    {
+        app.Logger.LogWarning("Skipping stock background job because Redis is unavailable.");
+    }
+}
+else
+{
+    app.Logger.LogWarning("PostgreSQL is unavailable. Hangfire background jobs are disabled.");
+}
+
+if (redisMultiplexer is null)
+{
+    app.Logger.LogWarning("Redis is unavailable. Real-time stock updates cache/broadcast may be limited.");
+}
 
 app.Run();
+
+static bool IsPostgresReachable(string? connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return false;
+    }
+
+    try
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Timeout = 3
+        };
+
+        using var connection = new NpgsqlConnection(builder.ConnectionString);
+        connection.Open();
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
+}
