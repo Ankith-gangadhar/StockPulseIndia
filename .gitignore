@@ -1,0 +1,43 @@
+# -----------------------------
+# Root ignore rules (API + UI)
+# -----------------------------
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.tmp
+
+# Node / Vite (frontend)
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/*.local
+
+# .NET / C# (backend)
+**/bin/
+**/obj/
+**/TestResults/
+*.rsuser
+*.nupkg
+*.snupkg
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
