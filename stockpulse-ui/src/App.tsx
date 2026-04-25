@@ -4,11 +4,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from './store';
 import { setStocks, setConnectionStatus } from './features/stockSlice';
 import { fetchDashboardData } from './features/dashboardSlice';
-import { ResponsiveGridLayout } from 'react-grid-layout';
+import GridLayout from 'react-grid-layout';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 const API_BASE = 'http://localhost:5200';
+const AnyGridLayout = GridLayout as any;
 const MAX_CHARTS = 10;
 const TIMEFRAMES = ['15m', '1h', '6h', '1d', '1w', '1m', '6m', '1y', '3y', '5y'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
@@ -74,6 +76,20 @@ function App() {
   const [chartTabs, setChartTabs] = useState<ChartTab[]>([
     { id: makeChartId(), symbol: 'NIFTY 50', title: 'NIFTY 50 Index', timeframe: '1d' },
   ]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [layout, setLayout] = useState<any>([
+    { i: 'quotes', x: 0, y: 0, w: 3, h: 5 },
+    { i: 'chart', x: 3, y: 0, w: 6, h: 6 },
+    { i: 'insights', x: 9, y: 0, w: 3, h: 3 },
+    { i: 'news', x: 9, y: 3, w: 3, h: 3 },
+    { i: 'watchlist', x: 0, y: 5, w: 4, h: 4 },
+    { i: 'buytoday', x: 4, y: 6, w: 4, h: 3 },
+    { i: 'fallen', x: 8, y: 6, w: 4, h: 3 },
+    { i: 'indexes', x: 0, y: 9, w: 6, h: 3 },
+    { i: 'risk', x: 6, y: 9, w: 3, h: 3 },
+    { i: 'criticalNews', x: 9, y: 9, w: 3, h: 3 },
+  ]);
+  const [gridWidth, setGridWidth] = useState(Math.max(1200, window.innerWidth - 20));
 
   useEffect(() => {
     dispatch(fetchDashboardData());
@@ -102,23 +118,43 @@ function App() {
     };
   }, [dispatch]);
 
+  useEffect(() => {
+    const onResize = () => setGridWidth(Math.max(1200, window.innerWidth - 20));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const symbolOptions = useMemo(() => {
     const stockSymbols = stocks.map((s) => ({
       symbol: s.symbol,
       title: s.name || s.symbol,
+      tvSymbol: `NSE:${s.symbol}`,
     }));
     return [
       ...stockSymbols,
-      { symbol: 'NIFTY 50', title: 'NIFTY 50 Index' },
-      { symbol: 'SENSEX', title: 'BSE SENSEX' },
-      { symbol: 'BANK NIFTY', title: 'NIFTY Bank Index' },
-      { symbol: 'RELIANCE', title: 'Reliance Industries' },
-      { symbol: 'TCS', title: 'Tata Consultancy Services' },
-      { symbol: 'HDFCBANK', title: 'HDFC Bank' },
-      { symbol: 'INFY', title: 'Infosys' },
-      { symbol: 'ITC', title: 'ITC Ltd' },
+      { symbol: 'NIFTY 50', title: 'NIFTY 50 Index', tvSymbol: 'NSE:NIFTY' },
+      { symbol: 'SENSEX', title: 'BSE SENSEX', tvSymbol: 'BSE:SENSEX' },
+      { symbol: 'BANK NIFTY', title: 'NIFTY Bank Index', tvSymbol: 'NSE:BANKNIFTY' },
+      { symbol: 'RELIANCE', title: 'Reliance Industries', tvSymbol: 'NSE:RELIANCE' },
+      { symbol: 'TCS', title: 'Tata Consultancy Services', tvSymbol: 'NSE:TCS' },
+      { symbol: 'HDFCBANK', title: 'HDFC Bank', tvSymbol: 'NSE:HDFCBANK' },
+      { symbol: 'INFY', title: 'Infosys', tvSymbol: 'NSE:INFY' },
+      { symbol: 'ITC', title: 'ITC Ltd', tvSymbol: 'NSE:ITC' },
     ];
   }, [stocks]);
+
+  const filteredSymbolOptions = useMemo(() => {
+    const query = chartQuery.trim().toUpperCase();
+    if (!query) return symbolOptions.slice(0, 8);
+
+    return symbolOptions
+      .filter(
+        (option) =>
+          option.symbol.toUpperCase().includes(query) ||
+          option.title.toUpperCase().includes(query),
+      )
+      .slice(0, 8);
+  }, [chartQuery, symbolOptions]);
 
   const addChartTab = () => {
     if (chartTabs.length >= MAX_CHARTS) return;
@@ -128,13 +164,14 @@ function App() {
     const match = symbolOptions.find(
       (option) => option.symbol.toUpperCase() === query || option.title.toUpperCase().includes(query),
     );
-    const selected = match ?? { symbol: query, title: `${query} Custom Chart` };
+    if (!match) return;
 
     setChartTabs((prev) => [
       ...prev,
-      { id: makeChartId(), symbol: selected.symbol, title: selected.title, timeframe: '1d' },
+      { id: makeChartId(), symbol: match.symbol, title: match.title, timeframe: '1d' },
     ]);
     setChartQuery('');
+    setShowSuggestions(false);
   };
 
   const removeChartTab = (id: string) => {
@@ -145,18 +182,41 @@ function App() {
     setChartTabs((prev) => prev.map((tab) => (tab.id === id ? { ...tab, timeframe } : tab)));
   };
 
-  const layout = [
-    { i: 'quotes', x: 0, y: 0, w: 3, h: 5 },
-    { i: 'chart', x: 3, y: 0, w: 6, h: 6 },
-    { i: 'insights', x: 9, y: 0, w: 3, h: 3 },
-    { i: 'news', x: 9, y: 3, w: 3, h: 3 },
-    { i: 'watchlist', x: 0, y: 5, w: 4, h: 4 },
-    { i: 'buytoday', x: 4, y: 6, w: 4, h: 3 },
-    { i: 'fallen', x: 8, y: 6, w: 4, h: 3 },
-    { i: 'indexes', x: 0, y: 9, w: 6, h: 3 },
-    { i: 'risk', x: 6, y: 9, w: 3, h: 3 },
-    { i: 'criticalNews', x: 9, y: 9, w: 3, h: 3 },
-  ];
+  const selectSuggestion = (symbol: string) => {
+    setChartQuery(symbol);
+    setShowSuggestions(false);
+  };
+
+  const generateLineData = (tab: ChartTab) => {
+    const base = Math.max(100, stocks.find((stock) => stock.symbol === tab.symbol)?.price ?? 24500);
+    const labels = ['09:15', '10:00', '10:45', '11:30', '12:15', '13:00', '13:45', '14:30', '15:15'];
+
+    return labels.map((label, index) => {
+      const factor = MOCK_CHART_POINTS[index % MOCK_CHART_POINTS.length] / 100;
+      const value = Number((base * (0.985 + factor * 0.03)).toFixed(2));
+      return { label, value };
+    });
+  };
+
+  const timeframeToTradingViewInterval: Record<Timeframe, string> = {
+    '15m': '15',
+    '1h': '60',
+    '6h': '240',
+    '1d': 'D',
+    '1w': 'W',
+    '1m': 'M',
+    '6m': 'M',
+    '1y': 'W',
+    '3y': 'W',
+    '5y': 'M',
+  };
+
+  const getTradingViewUrl = (symbol: string, timeframe: Timeframe) => {
+    const symbolData = symbolOptions.find((item) => item.symbol === symbol);
+    const tvSymbol = symbolData?.tvSymbol ?? `NSE:${symbol}`;
+    const interval = timeframeToTradingViewInterval[timeframe];
+    return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}&interval=${interval}`;
+  };
 
   return (
     <div className="min-h-screen bg-background font-mono text-gray-200">
@@ -179,12 +239,17 @@ function App() {
       </header>
 
       <div className="p-2">
-        <ResponsiveGridLayout
-          layouts={{ lg: layout }}
-          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-          cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+        <AnyGridLayout
+          layout={layout}
+          onLayoutChange={(nextLayout: any) => setLayout(nextLayout)}
+          cols={12}
           rowHeight={80}
-          width={window.innerWidth - 20}
+          width={gridWidth}
+          margin={[8, 8]}
+          containerPadding={[4, 4]}
+          isResizable
+          resizeHandles={['se']}
+          draggableHandle=".drag-handle"
         >
           <div key="quotes" className="bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
             <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
@@ -218,23 +283,50 @@ function App() {
               <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Chart Station</span>
               <span className="text-[10px] text-gray-600">{chartTabs.length}/{MAX_CHARTS} charts</span>
             </div>
-            <div className="px-3 pt-3 flex gap-2">
-              <input
-                value={chartQuery}
-                onChange={(e) => setChartQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') addChartTab();
-                }}
-                placeholder="Search symbol (RELIANCE, NIFTY 50)"
-                className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder:text-gray-500"
-              />
-              <button
-                onClick={addChartTab}
-                disabled={chartTabs.length >= MAX_CHARTS}
-                className="px-3 py-1 text-xs font-bold rounded border border-neonAmber/40 text-neonAmber disabled:text-gray-500 disabled:border-gray-700"
-              >
-                Add Chart
-              </button>
+            <div className="px-3 pt-3">
+              <div className="relative flex gap-2">
+                <input
+                  value={chartQuery}
+                  onFocus={() => setShowSuggestions(true)}
+                  onChange={(e) => {
+                    setChartQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addChartTab();
+                    if (e.key === 'Escape') setShowSuggestions(false);
+                  }}
+                  placeholder="Search symbol (RELIANCE, NIFTY 50)"
+                  className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder:text-gray-500"
+                />
+                <button
+                  onClick={addChartTab}
+                  disabled={chartTabs.length >= MAX_CHARTS}
+                  className="px-3 py-1 text-xs font-bold rounded border border-neonAmber/40 text-neonAmber disabled:text-gray-500 disabled:border-gray-700"
+                >
+                  Add Chart
+                </button>
+                {showSuggestions && filteredSymbolOptions.length > 0 && (
+                  <div className="absolute left-0 right-24 top-8 z-20 bg-gray-950 border border-gray-700 rounded-md max-h-44 overflow-y-auto">
+                    {filteredSymbolOptions.map((option) => (
+                      <button
+                        key={`${option.symbol}-${option.tvSymbol}`}
+                        onClick={() => selectSuggestion(option.symbol)}
+                        className="w-full text-left px-2 py-1.5 hover:bg-white/10 border-b border-gray-800 last:border-b-0"
+                      >
+                        <div className="text-xs text-white">{option.symbol}</div>
+                        <div className="text-[10px] text-gray-500">{option.title}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {chartQuery && filteredSymbolOptions.length === 0 && (
+                <div className="text-[10px] text-neonRed mt-1">No matching symbol found. Please select from suggestions.</div>
+              )}
+              <div className="text-[10px] text-gray-500 mt-1">
+                Suggestions only. Powered for Indian symbols (NSE/BSE mapping).
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {chartTabs.map((tab) => (
@@ -264,18 +356,44 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <div className="h-20 w-full bg-gradient-to-b from-gray-900 to-gray-950 rounded border border-gray-800 p-2">
-                    <div className="h-full flex items-end gap-1">
-                      {MOCK_CHART_POINTS.map((point, idx) => (
-                        <div
-                          key={`${tab.id}-p-${idx}`}
-                          style={{ height: `${point * 2}%` }}
-                          className="flex-1 bg-neonAmber/70 rounded-sm"
+                  <div className="h-44 w-full bg-gradient-to-b from-gray-900 to-gray-950 rounded border border-gray-800 p-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateLineData(tab)}>
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                        <YAxis hide domain={['dataMin - 30', 'dataMax + 30']} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#0f172a',
+                            border: '1px solid #334155',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                          }}
+                          formatter={(value) => [`Rs ${Number(value ?? 0).toFixed(2)}`, tab.symbol]}
                         />
-                      ))}
-                    </div>
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#f59e0b"
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 3, fill: '#22c55e' }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="mt-1 text-[10px] text-gray-500">View: {tab.timeframe} - Ready for TradingView chart integration.</div>
+                  <div className="mt-1 flex justify-between items-center gap-2">
+                    <span className="text-[10px] text-gray-500">
+                      View: {tab.timeframe} line chart
+                    </span>
+                    <a
+                      href={getTradingViewUrl(tab.symbol, tab.timeframe)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-neonAmber hover:text-neonGreen"
+                    >
+                      Open live in TradingView
+                    </a>
+                  </div>
                 </div>
               ))}
               {chartTabs.length === 0 && (
@@ -424,7 +542,7 @@ function App() {
               ))}
             </div>
           </div>
-        </ResponsiveGridLayout>
+        </AnyGridLayout>
       </div>
     </div>
   );

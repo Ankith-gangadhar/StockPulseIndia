@@ -36,3 +36,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* Make panel resize handles visible and easy to grab */
+.react-grid-item > .react-resizable-handle {
+  opacity: 1;
+  width: 16px;
+  height: 16px;
+  right: 2px;
+  bottom: 2px;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  border-right: 2px solid rgba(245, 158, 11, 0.9);
+  border-bottom: 2px solid rgba(245, 158, 11, 0.9);
+}
