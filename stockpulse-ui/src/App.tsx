@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState, AppDispatch } from './store';
 import { setStocks, setConnectionStatus } from './features/stockSlice';
 import { fetchDashboardData } from './features/dashboardSlice';
+import { Analytics } from '@vercel/analytics/react';
 import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -466,6 +467,7 @@ function App() {
           </div>
         </AnyGridLayout>
       </div>
+      <Analytics />
     </div>
   );
 }
