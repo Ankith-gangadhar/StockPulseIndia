@@ -27,8 +27,7 @@ const initialState: DashboardState = {
 export const fetchDashboardData = createAsyncThunk(
     'dashboard/fetchData',
     async () => {
-        // In production, would be environment variables, but for localhost MVP hardcoded is fine
-        const baseUrl = 'http://localhost:5200';
+        const baseUrl = import.meta.env.DEV ? 'http://localhost:5200' : 'https://stockpulseindia.onrender.com';
         const [insightsRes, newsRes] = await Promise.all([
             fetch(`${baseUrl}/api/dashboard/insights`),
             fetch(`${baseUrl}/api/dashboard/news`)

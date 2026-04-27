@@ -8,7 +8,7 @@ import GridLayout from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
-const API_BASE = 'http://localhost:5200';
+const API_BASE = import.meta.env.DEV ? 'http://localhost:5200' : 'https://stockpulseindia.onrender.com';
 const MAX_CHARTS = 10;
 const TIMEFRAMES = ['15m', '1h', '6h', '1d', '1w', '1m', '6m', '1y', '3y', '5y'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
@@ -333,9 +333,8 @@ function App() {
                       <button
                         key={`${tab.id}-${frame}`}
                         onClick={() => setTabTimeframe(tab.id, frame)}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                          tab.timeframe === frame ? 'border-neonGreen/60 text-neonGreen bg-neonGreen/10' : 'border-gray-700 text-gray-400'
-                        }`}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border ${tab.timeframe === frame ? 'border-neonGreen/60 text-neonGreen bg-neonGreen/10' : 'border-gray-700 text-gray-400'
+                          }`}
                       >
                         {frame}
                       </button>
