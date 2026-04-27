@@ -27,7 +27,7 @@ const initialState: DashboardState = {
 export const fetchDashboardData = createAsyncThunk(
     'dashboard/fetchData',
     async () => {
-        const baseUrl = import.meta.env.DEV ? 'http://localhost:5200' : 'https://stockpulseindia.onrender.com';
+        const baseUrl = 'https://stockpulseindia.onrender.com';
         const [insightsRes, newsRes] = await Promise.all([
             fetch(`${baseUrl}/api/dashboard/insights`),
             fetch(`${baseUrl}/api/dashboard/news`)
