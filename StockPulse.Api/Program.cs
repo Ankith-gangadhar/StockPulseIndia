@@ -57,7 +57,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp",
         corsBuilder =>
         {
-            corsBuilder.WithOrigins("http://localhost:5173")
+            corsBuilder.WithOrigins("http://localhost:5173", "https://stock-pulse-india.vercel.app")
                        .AllowAnyHeader()
                        .AllowAnyMethod()
                        .AllowCredentials(); // Required for SignalR
