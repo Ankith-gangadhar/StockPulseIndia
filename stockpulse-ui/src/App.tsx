@@ -50,15 +50,24 @@ const FALLEN_STOCKS = [
   { symbol: 'WIPRO', down: '-3.3%', note: 'IT outlook jitters after cautious management commentary.' },
 ];
 
+const BEST_TO_BUY = [
+  { symbol: 'RELIANCE', score: 88, pe: '28.5', revGrowth: '+12.4%', signal: 'Strong Buy' },
+  { symbol: 'HDFCBANK', score: 82, pe: '16.2', revGrowth: '+18.1%', signal: 'Buy' },
+  { symbol: 'INFY', score: 76, pe: '24.1', revGrowth: '+8.3%', signal: 'Buy' },
+  { symbol: 'TCS', score: 74, pe: '29.3', revGrowth: '+6.1%', signal: 'Hold' },
+  { symbol: 'ITC', score: 71, pe: '25.6', revGrowth: '+9.2%', signal: 'Hold' }
+];
+
 const makeChartId = () => `chart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 const initialLayout = [
-  { i: 'quotes', x: 0, y: 0, w: 3, h: 5, minW: 2, minH: 3 },
-  { i: 'chart', x: 3, y: 0, w: 6, h: 7, minW: 4, minH: 4 },
-  { i: 'insights', x: 9, y: 0, w: 3, h: 3, minW: 2, minH: 2 },
-  { i: 'news', x: 9, y: 3, w: 3, h: 4, minW: 2, minH: 2 },
-  { i: 'watchlist', x: 0, y: 5, w: 4, h: 4, minW: 3, minH: 3 },
-  { i: 'buytoday', x: 4, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
-  { i: 'fallen', x: 8, y: 7, w: 4, h: 3, minW: 2, minH: 2 },
+  { i: 'chart', x: 3, y: 0, w: 6, h: 5, minW: 3, minH: 3 },
+  { i: 'screener', x: 9, y: 0, w: 3, h: 5, minW: 2, minH: 3 },
+  { i: 'quotes', x: 0, y: 0, w: 3, h: 8, minW: 2, minH: 3 },
+  { i: 'insights', x: 3, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'buytoday', x: 6, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'fallen', x: 9, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'news', x: 3, y: 8, w: 6, h: 3, minW: 3, minH: 2 },
+  { i: 'watchlist', x: 9, y: 8, w: 3, h: 3, minW: 2, minH: 2 },
 ];
 
 function App() {
@@ -122,7 +131,7 @@ function App() {
   useEffect(() => {
     const seedDefaultChart = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/market/chart-config?symbol=NIFTY 50&timeframe=1d`);
+        const res = await fetch(`${API_BASE}/api/market/chart-config?symbol=RELIANCE&timeframe=1d`);
         if (!res.ok) return;
         const data = await res.json();
         setChartTabs([
@@ -254,6 +263,43 @@ function App() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          <div key="screener" className="bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Best To Buy Now (Screener)</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {BEST_TO_BUY.map((item, idx) => (
+                <div key={item.symbol} className="border border-gray-800 rounded p-2 bg-gray-900/30 hover:bg-white/5 transition-colors">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs font-bold text-white flex items-center gap-2">
+                      <span className="text-gray-600 text-[10px]">#{idx + 1}</span>
+                      {item.symbol}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.score >= 80 ? 'bg-neonGreen/20 text-neonGreen border border-neonGreen/30' : 'bg-neonAmber/20 text-neonAmber border border-neonAmber/30'}`}>
+                      Score: {item.score}/100
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
+                      <div className="text-gray-500 mb-0.5">P/E Ratio</div>
+                      <div className="font-mono text-gray-300">{item.pe} <span className="text-[9px] text-gray-600 ml-1">(Undervalued)</span></div>
+                    </div>
+                    <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
+                      <div className="text-gray-500 mb-0.5">Rev Growth</div>
+                      <div className="font-mono text-neonGreen">{item.revGrowth} <span className="text-[9px] text-gray-600 ml-1">(Growing)</span></div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-right">
+                    <span className={`text-[10px] font-bold uppercase tracking-wide ${item.signal.includes('Buy') ? 'text-neonGreen' : 'text-neonAmber'}`}>
+                      👉 {item.signal}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
