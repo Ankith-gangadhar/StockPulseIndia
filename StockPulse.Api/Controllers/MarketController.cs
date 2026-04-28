@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using System.Net.Http;
 
 namespace StockPulse.Api.Controllers;
 
@@ -6,6 +8,12 @@ namespace StockPulse.Api.Controllers;
 [Route("api/[controller]")]
 public class MarketController : ControllerBase
 {
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public MarketController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
     private static readonly IReadOnlyList<MarketSymbol> Symbols =
     [
         new("RELIANCE", "Reliance Industries", "NSE:RELIANCE"),
@@ -78,6 +86,54 @@ public class MarketController : ControllerBase
             EmbedUrl = embedUrl,
             FullChartUrl = fullChartUrl
         });
+    }
+
+    [HttpGet("live-quotes")]
+    public async Task<IActionResult> GetLiveQuotes()
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+        
+        var symbols = "RELIANCE.NS,TCS.NS,INFY.NS,HDFCBANK.NS,ITC.NS,LT.NS,SBIN.NS,BHARTIARTL.NS,SUNPHARMA.NS,TITAN.NS,ADANIPORTS.NS,WIPRO.NS,^NSEI";
+        var url = $"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}";
+        
+        try 
+        {
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            
+            using var document = JsonDocument.Parse(json);
+            var result = document.RootElement.GetProperty("quoteResponse").GetProperty("result");
+            
+            var stocks = new List<object>();
+            foreach (var item in result.EnumerateArray())
+            {
+                var sym = item.GetProperty("symbol").GetString()?.Replace(".NS", "").Replace("^NSEI", "NIFTY 50");
+                var price = item.TryGetProperty("regularMarketPrice", out var p) ? p.GetDouble() : 0;
+                var change = item.TryGetProperty("regularMarketChange", out var c) ? c.GetDouble() : 0;
+                var changePercent = item.TryGetProperty("regularMarketChangePercent", out var cp) ? cp.GetDouble() : 0;
+                var name = item.TryGetProperty("shortName", out var sn) ? sn.GetString() : sym;
+                var pe = item.TryGetProperty("trailingPE", out var peProp) ? peProp.GetDouble() : 0;
+                var marketCap = item.TryGetProperty("marketCap", out var mc) ? mc.GetDouble() : 0;
+                
+                stocks.Add(new {
+                    symbol = sym,
+                    name = name,
+                    price = price,
+                    change = change,
+                    changePercent = changePercent,
+                    pe = pe,
+                    marketCap = marketCap
+                });
+            }
+            
+            return Ok(stocks);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "Failed to fetch live quotes", Error = ex.Message });
+        }
     }
 
     public sealed record MarketSymbol(string Symbol, string Name, string TradingViewSymbol);

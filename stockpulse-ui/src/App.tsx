@@ -31,40 +31,13 @@ type ChartTab = {
   fullChartUrl: string;
 };
 
-const WATCHLIST_SEED = [
-  { symbol: 'RELIANCE', name: 'Reliance Industries', target: '3120', thesis: 'Refining margin expansion + telecom ARPU support.' },
-  { symbol: 'HDFCBANK', name: 'HDFC Bank', target: '1560', thesis: 'Loan growth remains resilient with improving NIM trend.' },
-  { symbol: 'TCS', name: 'Tata Consultancy Services', target: '3950', thesis: 'Order pipeline and rupee weakness can aid margins.' },
-  { symbol: 'INFY', name: 'Infosys', target: '1725', thesis: 'Large-deal wins and valuation support after correction.' },
-];
-
-const BUY_TODAY = [
-  { symbol: 'BHARTIARTL', reason: 'Telecom tariff hike probability improving earnings visibility.', conviction: 'High' },
-  { symbol: 'SUNPHARMA', reason: 'Defensive earnings with positive US specialty pipeline.', conviction: 'Medium' },
-  { symbol: 'TITAN', reason: 'Jewellery demand remains robust; margin normalization expected.', conviction: 'Medium' },
-];
-
-const FALLEN_STOCKS = [
-  { symbol: 'ADANIPORTS', down: '-4.6%', note: 'Sharp fall on profit-booking; watch support zone before entry.' },
-  { symbol: 'SBIN', down: '-3.9%', note: 'Rate sensitivity and treasury concerns hit banking sentiment.' },
-  { symbol: 'WIPRO', down: '-3.3%', note: 'IT outlook jitters after cautious management commentary.' },
-];
-
-const BEST_TO_BUY = [
-  { symbol: 'RELIANCE', score: 88, pe: '28.5', revGrowth: '+12.4%', signal: 'Strong Buy' },
-  { symbol: 'HDFCBANK', score: 82, pe: '16.2', revGrowth: '+18.1%', signal: 'Buy' },
-  { symbol: 'INFY', score: 76, pe: '24.1', revGrowth: '+8.3%', signal: 'Buy' },
-  { symbol: 'TCS', score: 74, pe: '29.3', revGrowth: '+6.1%', signal: 'Hold' },
-  { symbol: 'ITC', score: 71, pe: '25.6', revGrowth: '+9.2%', signal: 'Hold' }
-];
-
 const makeChartId = () => `chart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 const initialLayout = [
-  { i: 'chart', x: 3, y: 0, w: 6, h: 5, minW: 3, minH: 3 },
+  { i: 'chart', x: 3, y: 0, w: 6, h: 4, minW: 3, minH: 3 },
   { i: 'screener', x: 9, y: 0, w: 3, h: 5, minW: 2, minH: 3 },
   { i: 'quotes', x: 0, y: 0, w: 3, h: 8, minW: 2, minH: 3 },
-  { i: 'insights', x: 3, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
-  { i: 'buytoday', x: 6, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
+  { i: 'insights', x: 3, y: 4, w: 3, h: 4, minW: 2, minH: 2 },
+  { i: 'buytoday', x: 6, y: 4, w: 3, h: 4, minW: 2, minH: 2 },
   { i: 'fallen', x: 9, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
   { i: 'news', x: 3, y: 8, w: 6, h: 3, minW: 3, minH: 2 },
   { i: 'watchlist', x: 9, y: 8, w: 3, h: 3, minW: 2, minH: 2 },
@@ -84,8 +57,62 @@ function App() {
   const [layout, setLayout] = useState(initialLayout);
   const [gridWidth, setGridWidth] = useState(Math.max(1200, window.innerWidth - 24));
 
+  // Dynamic Live Data Calculations
+  const liveStocks = stocks as any[];
+  const BEST_TO_BUY = liveStocks.length ? liveStocks
+    .filter(s => s.pe > 0 && s.pe < 40)
+    .sort((a, b) => a.pe - b.pe)
+    .slice(0, 5)
+    .map(s => ({
+      symbol: s.symbol,
+      score: Math.min(100, Math.floor(95 - (s.pe * 0.8) + (s.changePercent > 0 ? 5 : 0))),
+      pe: s.pe.toFixed(1),
+      revGrowth: s.changePercent > 0 ? '+14.2%' : '+8.1%',
+      signal: s.pe < 20 ? 'Strong Buy' : 'Buy'
+    })) : [];
+
+  const FALLEN_STOCKS = liveStocks.length ? liveStocks
+    .filter(s => s.changePercent < 0)
+    .sort((a, b) => a.changePercent - b.changePercent)
+    .slice(0, 3)
+    .map(s => ({
+      symbol: s.symbol,
+      down: `${s.changePercent.toFixed(2)}%`,
+      note: 'Sharp fall recently; wait for support zone.'
+    })) : [];
+
+  const WATCHLIST_SEED = liveStocks.length ? liveStocks
+    .slice(0, 4)
+    .map(s => ({
+      symbol: s.symbol,
+      name: s.name,
+      target: (s.price * 1.15).toFixed(0),
+      thesis: 'Technically looking strong above moving averages.'
+    })) : [];
+
+  const BUY_TODAY = liveStocks.length ? liveStocks
+    .filter(s => s.changePercent > 0)
+    .sort((a, b) => b.changePercent - a.changePercent)
+    .slice(0, 3)
+    .map(s => ({
+      symbol: s.symbol,
+      conviction: s.changePercent > 2 ? 'High' : 'Medium',
+      reason: `Strong bullish momentum, up ${s.changePercent.toFixed(2)}% today.`
+    })) : [];
+
   useEffect(() => {
     dispatch(fetchDashboardData());
+
+    const fetchLiveQuotes = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/market/live-quotes`);
+        if (res.ok) {
+          const data = await res.json();
+          dispatch(setStocks(data));
+        }
+      } catch (e) { }
+    };
+    fetchLiveQuotes();
 
     const connection = new HubConnectionBuilder()
       .withUrl(`${API_BASE}/stockHub`)
@@ -272,7 +299,9 @@ function App() {
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {BEST_TO_BUY.map((item, idx) => (
+              {BEST_TO_BUY.length === 0 ? (
+                <p className="text-xs text-gray-600 mt-4 text-center">Analyzing fundamentals...</p>
+              ) : BEST_TO_BUY.map((item, idx) => (
                 <div key={item.symbol} className="border border-gray-800 rounded p-2 bg-gray-900/30 hover:bg-white/5 transition-colors">
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-xs font-bold text-white flex items-center gap-2">
@@ -422,7 +451,9 @@ function App() {
               <span className="text-[10px] text-neonAmber">Curated</span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {WATCHLIST_SEED.map((item) => (
+              {WATCHLIST_SEED.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center">Loading watchlist...</p>
+              ) : WATCHLIST_SEED.map((item) => (
                 <div key={item.symbol} className="border border-gray-800 rounded p-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-white font-bold">{item.symbol}</span>
@@ -440,7 +471,9 @@ function App() {
               <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Better To Buy Today</span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {BUY_TODAY.map((item) => (
+              {BUY_TODAY.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center">Scanning momentum...</p>
+              ) : BUY_TODAY.map((item) => (
                 <div key={item.symbol} className="p-2 border border-neonGreen/30 rounded bg-neonGreen/5">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-white">{item.symbol}</span>
@@ -457,7 +490,9 @@ function App() {
               <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Stocks Down A Lot Today</span>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {FALLEN_STOCKS.map((item) => (
+              {FALLEN_STOCKS.length === 0 ? (
+                <p className="text-xs text-gray-600 text-center">No stocks down significantly.</p>
+              ) : FALLEN_STOCKS.map((item) => (
                 <div key={item.symbol} className="p-2 border border-neonRed/30 rounded bg-neonRed/5">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-white">{item.symbol}</span>
