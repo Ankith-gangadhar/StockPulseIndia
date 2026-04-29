@@ -247,7 +247,7 @@ function App() {
       </header>
 
       <div className="p-2 columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-2">
-          <div key="quotes" className="break-inside-avoid mb-2 bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
+          <div key="quotes" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
               <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen border border-neonGreen/20">LIVE</span>
@@ -274,7 +274,7 @@ function App() {
             </div>
           </div>
 
-          <div key="screener" className="break-inside-avoid mb-2 bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
+          <div key="screener" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Best To Buy Now (Screener)</span>
               <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
@@ -313,7 +313,7 @@ function App() {
             </div>
           </div>
 
-          <div key="chart" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="chart" className="break-inside-avoid mb-2 min-h-[350px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Chart Station</span>
               <span className="text-[8px] text-gray-600">{chartTabs.length}/{MAX_CHARTS} charts</span>
@@ -426,7 +426,7 @@ function App() {
             </div>
           </div>
 
-          <div key="watchlist" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="watchlist" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <div className="flex items-center gap-1">
                 <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Smart Watchlist</span>
@@ -452,7 +452,7 @@ function App() {
             </div>
           </div>
 
-          <div key="buytoday" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="buytoday" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <div className="flex items-center gap-1">
                 <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Better To Buy Today</span>
@@ -476,7 +476,7 @@ function App() {
             </div>
           </div>
 
-          <div key="fallen" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="fallen" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <div className="flex items-center gap-1">
                 <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Stocks Down A Lot Today</span>
@@ -500,7 +500,7 @@ function App() {
             </div>
           </div>
 
-          <div key="insights" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="insights" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">AI Insights</span>
               <span className="text-[8px] text-neonAmber font-bold">ALERT</span>
@@ -523,7 +523,7 @@ function App() {
             </div>
           </div>
 
-          <div key="news" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
+          <div key="news" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
               <div className="flex items-center gap-1">
                 <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">News Sentinel</span>
