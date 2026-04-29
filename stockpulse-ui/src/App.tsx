@@ -5,15 +5,12 @@ import type { RootState, AppDispatch } from './store';
 import { setStocks, setConnectionStatus } from './features/stockSlice';
 import { fetchDashboardData } from './features/dashboardSlice';
 import { Analytics } from '@vercel/analytics/react';
-import GridLayout from 'react-grid-layout';
-import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
 const API_BASE = 'https://stockpulseindia.onrender.com';
 const MAX_CHARTS = 10;
 const TIMEFRAMES = ['15m', '1h', '6h', '1d', '1w', '1m', '6m', '1y', '3y', '5y'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
-const AnyGridLayout = GridLayout as any;
 
 type Suggestion = {
   symbol: string;
@@ -32,16 +29,21 @@ type ChartTab = {
 };
 
 const makeChartId = () => `chart-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-const initialLayout = [
-  { i: 'chart', x: 3, y: 0, w: 6, h: 4, minW: 3, minH: 3 },
-  { i: 'screener', x: 9, y: 0, w: 3, h: 5, minW: 2, minH: 3 },
-  { i: 'quotes', x: 0, y: 0, w: 3, h: 8, minW: 2, minH: 3 },
-  { i: 'insights', x: 3, y: 4, w: 3, h: 4, minW: 2, minH: 2 },
-  { i: 'buytoday', x: 6, y: 4, w: 3, h: 4, minW: 2, minH: 2 },
-  { i: 'fallen', x: 9, y: 5, w: 3, h: 3, minW: 2, minH: 2 },
-  { i: 'news', x: 3, y: 8, w: 6, h: 3, minW: 3, minH: 2 },
-  { i: 'watchlist', x: 9, y: 8, w: 3, h: 3, minW: 2, minH: 2 },
+const FINANCIALS_DATA = [
+  { metric: 'Revenue (Q3)', value: '₹2.4L Cr', growth: '+11% YoY', status: 'good' },
+  { metric: 'Net Profit', value: '₹21K Cr', growth: '+15% YoY', status: 'good' },
+  { metric: 'EBITDA Margin', value: '18.4%', growth: '+120 bps', status: 'good' },
+  { metric: 'Debt/Equity', value: '0.4x', growth: 'Stable', status: 'neutral' },
 ];
+
+const RISK_PROFILE = {
+  level: 'LOW RISK 🟢',
+  color: 'text-neonGreen',
+  bg: 'bg-neonGreen/10',
+  beta: '0.92',
+  volatility: '14.2%',
+  warning: 'None currently.'
+};
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -54,8 +56,6 @@ function App() {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
   const [chartTabs, setChartTabs] = useState<ChartTab[]>([]);
-  const [layout, setLayout] = useState(initialLayout);
-  const [gridWidth, setGridWidth] = useState(Math.max(1200, window.innerWidth - 24));
 
   // Dynamic Live Data Calculations
   const liveStocks = stocks as any[];
@@ -130,12 +130,6 @@ function App() {
 
     return () => { connection.stop(); };
   }, [dispatch]);
-
-  useEffect(() => {
-    const onResize = () => setGridWidth(Math.max(1200, window.innerWidth - 24));
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(async () => {
@@ -241,7 +235,7 @@ function App() {
             STOCK<span className="text-neonAmber">PULSE</span> <span className="text-gray-500">INDIA</span>
           </h1>
         </div>
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-4 text-[8px] text-gray-500">
           <span>NSE / BSE</span>
           <span className="text-gray-700">|</span>
           <span>
@@ -252,38 +246,25 @@ function App() {
         </div>
       </header>
 
-      <div className="p-2">
-        <AnyGridLayout
-          layout={layout}
-          onLayoutChange={(next: any) => setLayout(next)}
-          cols={12}
-          width={gridWidth}
-          rowHeight={80}
-          margin={[8, 8]}
-          containerPadding={[4, 4]}
-          isResizable
-          resizeHandles={['se']}
-          draggableHandle=".drag-handle"
-          useCSSTransforms
-        >
-          <div key="quotes" className="bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen border border-neonGreen/20">LIVE</span>
+      <div className="p-2 columns-1 sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5 gap-2">
+          <div key="quotes" className="break-inside-avoid mb-2 bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen border border-neonGreen/20">LIVE</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
               {stocks.length === 0 ? (
-                <p className="text-xs text-gray-600 mt-4 text-center">Waiting for market data...</p>
+                <p className="text-[8px] text-gray-600 mt-4 text-center">Waiting for market data...</p>
               ) : (
                 stocks.map((stock: any) => (
                   <div key={stock.symbol} className="flex justify-between items-center py-1.5 px-2 border-b border-gray-800/60 hover:bg-white/5 rounded transition-colors group cursor-pointer">
                     <div>
                       <div className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors">{stock.symbol}</div>
-                      <div className="text-[10px] text-gray-600">{stock.name}</div>
+                      <div className="text-[8px] text-gray-600">{stock.name}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-mono">Rs {stock.price?.toFixed(2)}</div>
-                      <div className={`text-[10px] font-bold ${(stock.change ?? 0) >= 0 ? 'text-neonGreen' : 'text-neonRed'}`}>
+                      <div className={`text-[8px] font-bold ${(stock.change ?? 0) >= 0 ? 'text-neonGreen' : 'text-neonRed'}`}>
                         {(stock.change ?? 0) >= 0 ? 'UP' : 'DOWN'} {Math.abs(stock.changePercent ?? 0).toFixed(2)}%
                       </div>
                     </div>
@@ -293,37 +274,37 @@ function App() {
             </div>
           </div>
 
-          <div key="screener" className="bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Best To Buy Now (Screener)</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
+          <div key="screener" className="break-inside-avoid mb-2 bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Best To Buy Now (Screener)</span>
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-1 space-y-3">
               {BEST_TO_BUY.length === 0 ? (
-                <p className="text-xs text-gray-600 mt-4 text-center">Analyzing fundamentals...</p>
+                <p className="text-[8px] text-gray-600 mt-4 text-center">Analyzing fundamentals...</p>
               ) : BEST_TO_BUY.map((item, idx) => (
-                <div key={item.symbol} className="border border-gray-800 rounded p-2 bg-gray-900/30 hover:bg-white/5 transition-colors">
+                <div key={item.symbol} className="border border-gray-800 rounded p-1 bg-gray-900/30 hover:bg-white/5 transition-colors">
                   <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-xs font-bold text-white flex items-center gap-2">
-                      <span className="text-gray-600 text-[10px]">#{idx + 1}</span>
+                    <span className="text-[8px] font-bold text-white flex items-center gap-1">
+                      <span className="text-gray-600 text-[8px]">#{idx + 1}</span>
                       {item.symbol}
                     </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.score >= 80 ? 'bg-neonGreen/20 text-neonGreen border border-neonGreen/30' : 'bg-neonAmber/20 text-neonAmber border border-neonAmber/30'}`}>
+                    <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${item.score >= 80 ? 'bg-neonGreen/20 text-neonGreen border border-neonGreen/30' : 'bg-neonAmber/20 text-neonAmber border border-neonAmber/30'}`}>
                       Score: {item.score}/100
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="grid grid-cols-2 gap-1 text-[8px]">
                     <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
                       <div className="text-gray-500 mb-0.5">P/E Ratio</div>
-                      <div className="font-mono text-gray-300">{item.pe} <span className="text-[9px] text-gray-600 ml-1">(Undervalued)</span></div>
+                      <div className="font-mono text-gray-300">{item.pe} <span className="text-[8px] text-gray-600 ml-1">(Undervalued)</span></div>
                     </div>
                     <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
                       <div className="text-gray-500 mb-0.5">Rev Growth</div>
-                      <div className="font-mono text-neonGreen">{item.revGrowth} <span className="text-[9px] text-gray-600 ml-1">(Growing)</span></div>
+                      <div className="font-mono text-neonGreen">{item.revGrowth} <span className="text-[8px] text-gray-600 ml-1">(Growing)</span></div>
                     </div>
                   </div>
                   <div className="mt-2 text-right">
-                    <span className={`text-[10px] font-bold uppercase tracking-wide ${item.signal.includes('Buy') ? 'text-neonGreen' : 'text-neonAmber'}`}>
+                    <span className={`text-[8px] font-bold uppercase tracking-wide ${item.signal.includes('Buy') ? 'text-neonGreen' : 'text-neonAmber'}`}>
                       👉 {item.signal}
                     </span>
                   </div>
@@ -332,13 +313,13 @@ function App() {
             </div>
           </div>
 
-          <div key="chart" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Chart Station</span>
-              <span className="text-[10px] text-gray-600">{chartTabs.length}/{MAX_CHARTS} charts</span>
+          <div key="chart" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Chart Station</span>
+              <span className="text-[8px] text-gray-600">{chartTabs.length}/{MAX_CHARTS} charts</span>
             </div>
             <div className="px-3 pt-3">
-              <div className="relative flex gap-2">
+              <div className="relative flex gap-1">
                 <input
                   value={chartQuery}
                   onFocus={() => setShowSuggestions(true)}
@@ -352,19 +333,19 @@ function App() {
                     if (e.key === 'Escape') setShowSuggestions(false);
                   }}
                   placeholder="Search symbol (RELIANCE, NIFTY 50)"
-                  className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder:text-gray-500"
+                  className="flex-1 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[8px] text-gray-100 placeholder:text-gray-500"
                 />
                 <button
                   onClick={addChartTab}
                   disabled={chartTabs.length >= MAX_CHARTS || !selectedSuggestion}
-                  className="px-3 py-1 text-xs font-bold rounded border border-neonAmber/40 text-neonAmber disabled:text-gray-500 disabled:border-gray-700"
+                  className="px-3 py-1 text-[8px] font-bold rounded border border-neonAmber/40 text-neonAmber disabled:text-gray-500 disabled:border-gray-700"
                 >
                   Add Chart
                 </button>
                 {showSuggestions && (
                   <div className="absolute left-0 right-24 top-8 z-20 bg-gray-950 border border-gray-700 rounded-md max-h-44 overflow-y-auto">
-                    {isLoadingSuggestions && <div className="px-2 py-2 text-[10px] text-gray-500">Loading symbols...</div>}
-                    {!isLoadingSuggestions && suggestions.length === 0 && <div className="px-2 py-2 text-[10px] text-neonRed">No symbol matches found.</div>}
+                    {isLoadingSuggestions && <div className="px-2 py-2 text-[8px] text-gray-500">Loading symbols...</div>}
+                    {!isLoadingSuggestions && suggestions.length === 0 && <div className="px-2 py-2 text-[8px] text-neonRed">No symbol matches found.</div>}
                     {!isLoadingSuggestions && suggestions.map((option) => (
                       <button
                         key={`${option.symbol}-${option.tradingViewSymbol}`}
@@ -373,33 +354,33 @@ function App() {
                           setSelectedSuggestion(option);
                           setShowSuggestions(false);
                         }}
-                        className="w-full text-left px-2 py-1.5 hover:bg-white/10 border-b border-gray-800 last:border-b-0"
+                        className="w-full text-left px-1.5 py-0.5 hover:bg-white/10 border-b border-gray-800 last:border-b-0"
                       >
-                        <div className="text-xs text-white">{option.symbol}</div>
-                        <div className="text-[10px] text-gray-500">{option.name}</div>
+                        <div className="text-[8px] text-white">{option.symbol}</div>
+                        <div className="text-[8px] text-gray-500">{option.name}</div>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
               {chartQuery && !selectedSuggestion && !isLoadingSuggestions && (
-                <div className="text-[10px] text-neonRed mt-1">Please select one symbol from suggestions.</div>
+                <div className="text-[8px] text-neonRed mt-1">Please select one symbol from suggestions.</div>
               )}
-              <div className="text-[10px] text-gray-500 mt-1">
+              <div className="text-[8px] text-gray-500 mt-1">
                 Suggestions only. Powered for Indian symbols (NSE/BSE mapping).
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-1 space-y-3">
               {chartTabs.map((tab) => (
-                <div key={tab.id} className="border border-gray-800 rounded-md p-2 bg-gray-900/40">
-                  <div className="flex justify-between items-center gap-2 mb-2">
+                <div key={tab.id} className="border border-gray-800 rounded-md p-1 bg-gray-900/40">
+                  <div className="flex justify-between items-center gap-1 mb-2">
                     <div>
-                      <div className="text-xs font-bold text-white">{tab.symbol}</div>
-                      <div className="text-[10px] text-gray-500">{tab.title}</div>
+                      <div className="text-[8px] font-bold text-white">{tab.symbol}</div>
+                      <div className="text-[8px] text-gray-500">{tab.title}</div>
                     </div>
                     <button
                       onClick={() => removeChartTab(tab.id)}
-                      className="text-[10px] px-2 py-0.5 border border-gray-700 rounded text-gray-400 hover:text-neonRed hover:border-neonRed/50"
+                      className="text-[8px] px-2 py-0.5 border border-gray-700 rounded text-gray-400 hover:text-neonRed hover:border-neonRed/50"
                     >
                       Remove
                     </button>
@@ -409,14 +390,14 @@ function App() {
                       <button
                         key={`${tab.id}-${frame}`}
                         onClick={() => setTabTimeframe(tab.id, frame)}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border ${tab.timeframe === frame ? 'border-neonGreen/60 text-neonGreen bg-neonGreen/10' : 'border-gray-700 text-gray-400'
+                        className={`text-[8px] px-1.5 py-0.5 rounded border ${tab.timeframe === frame ? 'border-neonGreen/60 text-neonGreen bg-neonGreen/10' : 'border-gray-700 text-gray-400'
                           }`}
                       >
                         {frame}
                       </button>
                     ))}
                   </div>
-                  <div className="h-56 w-full rounded border border-gray-800 overflow-hidden">
+                  <div className="h-32 w-full rounded border border-gray-800 overflow-hidden">
                     <iframe
                       title={`${tab.symbol}-${tab.timeframe}`}
                       src={tab.embedUrl}
@@ -424,15 +405,15 @@ function App() {
                       loading="lazy"
                     />
                   </div>
-                  <div className="mt-1 flex justify-between items-center gap-2">
-                    <span className="text-[10px] text-gray-500">
+                  <div className="mt-1 flex justify-between items-center gap-1">
+                    <span className="text-[8px] text-gray-500">
                       View: {tab.timeframe} line chart
                     </span>
                     <a
                       href={tab.fullChartUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[10px] text-neonAmber hover:text-neonGreen"
+                      className="text-[8px] text-neonAmber hover:text-neonGreen"
                     >
                       Open live in TradingView
                     </a>
@@ -440,86 +421,101 @@ function App() {
                 </div>
               ))}
               {chartTabs.length === 0 && (
-                <div className="text-center text-xs text-gray-500 py-6">Add a symbol to open chart tabs (max {MAX_CHARTS}).</div>
+                <div className="text-center text-[8px] text-gray-500 py-6">Add a symbol to open chart tabs (max {MAX_CHARTS}).</div>
               )}
             </div>
           </div>
 
-          <div key="watchlist" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Smart Watchlist</span>
-              <span className="text-[10px] text-neonAmber">Curated</span>
+          <div key="watchlist" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Smart Watchlist</span>
+                <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
+                </span>
+              </div>
+              <span className="text-[8px] text-neonAmber">Curated</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
               {WATCHLIST_SEED.length === 0 ? (
-                <p className="text-xs text-gray-600 text-center">Loading watchlist...</p>
+                <p className="text-[8px] text-gray-600 text-center">Loading watchlist...</p>
               ) : WATCHLIST_SEED.map((item) => (
-                <div key={item.symbol} className="border border-gray-800 rounded p-2">
+                <div key={item.symbol} className="border border-gray-800 rounded p-1">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-white font-bold">{item.symbol}</span>
-                    <span className="text-[10px] text-neonGreen">Target Rs {item.target}</span>
+                    <span className="text-[8px] text-white font-bold">{item.symbol}</span>
+                    <span className="text-[8px] text-neonGreen">Target Rs {item.target}</span>
                   </div>
-                  <div className="text-[10px] text-gray-500">{item.name}</div>
-                  <div className="text-[10px] text-gray-300 mt-1">{item.thesis}</div>
+                  <div className="text-[8px] text-gray-500">{item.name}</div>
+                  <div className="text-[8px] text-gray-300 mt-1">{item.thesis}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div key="buytoday" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Better To Buy Today</span>
+          <div key="buytoday" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Better To Buy Today</span>
+                <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
+                </span>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
               {BUY_TODAY.length === 0 ? (
-                <p className="text-xs text-gray-600 text-center">Scanning momentum...</p>
+                <p className="text-[8px] text-gray-600 text-center">Scanning momentum...</p>
               ) : BUY_TODAY.map((item) => (
-                <div key={item.symbol} className="p-2 border border-neonGreen/30 rounded bg-neonGreen/5">
+                <div key={item.symbol} className="p-1 border border-neonGreen/30 rounded bg-neonGreen/5">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-white">{item.symbol}</span>
-                    <span className="text-[10px] text-neonGreen">{item.conviction}</span>
+                    <span className="text-[8px] font-bold text-white">{item.symbol}</span>
+                    <span className="text-[8px] text-neonGreen">{item.conviction}</span>
                   </div>
-                  <div className="text-[10px] text-gray-300 mt-1">{item.reason}</div>
+                  <div className="text-[8px] text-gray-300 mt-1">{item.reason}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div key="fallen" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Stocks Down A Lot Today</span>
+          <div key="fallen" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Stocks Down A Lot Today</span>
+                <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
+                </span>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
               {FALLEN_STOCKS.length === 0 ? (
-                <p className="text-xs text-gray-600 text-center">No stocks down significantly.</p>
+                <p className="text-[8px] text-gray-600 text-center">No stocks down significantly.</p>
               ) : FALLEN_STOCKS.map((item) => (
-                <div key={item.symbol} className="p-2 border border-neonRed/30 rounded bg-neonRed/5">
+                <div key={item.symbol} className="p-1 border border-neonRed/30 rounded bg-neonRed/5">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-white">{item.symbol}</span>
-                    <span className="text-[10px] text-neonRed">{item.down}</span>
+                    <span className="text-[8px] font-bold text-white">{item.symbol}</span>
+                    <span className="text-[8px] text-neonRed">{item.down}</span>
                   </div>
-                  <div className="text-[10px] text-gray-300 mt-1">{item.note}</div>
+                  <div className="text-[8px] text-gray-300 mt-1">{item.note}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div key="insights" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">AI Insights</span>
-              <span className="text-[10px] text-neonAmber font-bold">ALERT</span>
+          <div key="insights" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">AI Insights</span>
+              <span className="text-[8px] text-neonAmber font-bold">ALERT</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {loading && <p className="text-xs text-gray-600">Initializing AI models...</p>}
+            <div className="flex-1 overflow-y-auto p-1 space-y-3">
+              {loading && <p className="text-[8px] text-gray-600">Initializing AI models...</p>}
               {insights.map((insight: any, idx: number) => (
                 <div
                   key={idx}
                   className="border-l-2 pl-2 py-1"
                   style={{ borderColor: insight.sentiment === 'Bullish' ? '#00ff41' : insight.sentiment === 'Bearish' ? '#ff003c' : '#ffb000' }}
                 >
-                  <div className="text-[10px] font-bold uppercase text-gray-500">{insight.type}</div>
-                  <div className="text-xs text-gray-200 mt-0.5">{insight.message}</div>
-                  <div className={`text-[10px] mt-1 font-bold ${insight.sentiment === 'Bullish' ? 'text-neonGreen' : insight.sentiment === 'Bearish' ? 'text-neonRed' : 'text-neonAmber'}`}>
+                  <div className="text-[8px] font-bold uppercase text-gray-500">{insight.type}</div>
+                  <div className="text-[8px] text-gray-200 mt-0.5">{insight.message}</div>
+                  <div className={`text-[8px] mt-1 font-bold ${insight.sentiment === 'Bullish' ? 'text-neonGreen' : insight.sentiment === 'Bearish' ? 'text-neonRed' : 'text-neonAmber'}`}>
                     {insight.sentiment}
                   </div>
                 </div>
@@ -527,26 +523,79 @@ function App() {
             </div>
           </div>
 
-          <div key="news" className="bg-surface border border-gray-800 flex flex-col">
-            <div className="drag-handle cursor-move flex justify-between items-center px-3 py-2 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">News Sentinel</span>
+          <div key="news" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">News Sentinel</span>
+                <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
+                </span>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {loading && <p className="text-xs text-gray-600">Scanning headlines...</p>}
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
+              {loading && <p className="text-[8px] text-gray-600">Scanning headlines...</p>}
               {news.map((n: any, idx: number) => (
                 <div key={idx} className="py-2 border-b border-gray-800/50 hover:bg-white/5 px-1 rounded cursor-pointer">
-                  <div className="text-xs text-gray-200">{n.headline}</div>
+                  <div className="text-[8px] text-gray-200">{n.headline}</div>
                   <div className="flex justify-between items-center mt-1">
-                    <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${n.impact === 'Positive' ? 'bg-neonGreen/15 text-neonGreen' : 'bg-neonRed/15 text-neonRed'}`}>
+                    <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded ${n.impact === 'Positive' ? 'bg-neonGreen/15 text-neonGreen' : 'bg-neonRed/15 text-neonRed'}`}>
                       {n.impact}
                     </span>
-                    <span className="text-[9px] text-gray-600">{n.time}</span>
+                    <span className="text-[8px] text-gray-600">{n.time}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        </AnyGridLayout>
+
+          <div key="financials" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <div className="flex items-center gap-1">
+                <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Financial Summary</span>
+                <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
+                </span>
+              </div>
+              <span className="text-[8px] text-neonAmber">Q3 FY26</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-1 space-y-3">
+              <div className="text-[8px] text-gray-500 mb-1">Reliance Industries (Consolidated)</div>
+              {FINANCIALS_DATA.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center border-b border-gray-800/50 pb-2 last:border-0">
+                  <span className="text-[8px] text-gray-300">{item.metric}</span>
+                  <div className="text-right">
+                    <div className="text-[8px] font-mono font-bold text-white">{item.value}</div>
+                    <div className={`text-[8px] font-bold ${item.status === 'good' ? 'text-neonGreen' : 'text-gray-500'}`}>{item.growth}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div key="risk" className="break-inside-avoid mb-2 bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors">
+            <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-1 flex flex-col justify-center items-center">
+              <div className={`px-4 py-2 rounded border border-gray-700 font-bold tracking-widest text-sm ${RISK_PROFILE.bg} ${RISK_PROFILE.color}`}>
+                {RISK_PROFILE.level}
+              </div>
+              <div className="w-full mt-4 space-y-2 text-[8px]">
+                <div className="flex justify-between border-b border-gray-800/50 pb-1">
+                  <span className="text-gray-500">Beta (vs NIFTY)</span>
+                  <span className="font-mono text-white">{RISK_PROFILE.beta}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-800/50 pb-1">
+                  <span className="text-gray-500">30D Volatility</span>
+                  <span className="font-mono text-white">{RISK_PROFILE.volatility}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-800/50 pb-1">
+                  <span className="text-gray-500">Active Warnings</span>
+                  <span className="text-gray-400">{RISK_PROFILE.warning}</span>
+                </div>
+              </div>
+            </div>
+          </div>
       </div>
       <Analytics />
     </div>
