@@ -59,17 +59,7 @@ function App() {
 
   // Dynamic Live Data Calculations
   const liveStocks = stocks as any[];
-  const BEST_TO_BUY = liveStocks.length ? liveStocks
-    .filter(s => s.pe > 0 && s.pe < 40)
-    .sort((a, b) => a.pe - b.pe)
-    .slice(0, 5)
-    .map(s => ({
-      symbol: s.symbol,
-      score: Math.min(100, Math.floor(95 - (s.pe * 0.8) + (s.changePercent > 0 ? 5 : 0))),
-      pe: s.pe.toFixed(1),
-      revGrowth: s.changePercent > 0 ? '+14.2%' : '+8.1%',
-      signal: s.pe < 20 ? 'Strong Buy' : 'Buy'
-    })) : [];
+
 
   const FALLEN_STOCKS = liveStocks.length ? liveStocks
     .filter(s => s.changePercent < 0)
@@ -148,6 +138,21 @@ function App() {
 
     return () => clearTimeout(timeout);
   }, [chartQuery]);
+
+  const [screenerData, setScreenerData] = useState<any[]>([]);
+  const [screenerTab, setScreenerTab] = useState('PE');
+  useEffect(() => {
+    const fetchScreener = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/screener/metrics`);
+        if (res.ok) {
+          const data = await res.json();
+          setScreenerData(data);
+        }
+      } catch (e) { }
+    };
+    fetchScreener();
+  }, []);
 
   useEffect(() => {
     const seedDefaultChart = async () => {
@@ -274,42 +279,103 @@ function App() {
             </div>
           </div>
 
-          <div key="screener" className="break-inside-avoid mb-2 min-h-[120px] bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
+          <div key="screener" className="break-inside-avoid mb-2 min-h-[200px] bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col resize-y overflow-hidden">
             <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Best To Buy Now (Screener)</span>
-              <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">AI RANKED</span>
+              <span className="text-[8px] uppercase tracking-widest text-gray-500 font-bold">Advanced Screener</span>
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-neonGreen/10 text-neonGreen font-bold border border-neonGreen/20">DATA-DRIVEN</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-1 space-y-3">
-              {BEST_TO_BUY.length === 0 ? (
-                <p className="text-[8px] text-gray-600 mt-4 text-center">Analyzing fundamentals...</p>
-              ) : BEST_TO_BUY.map((item, idx) => (
-                <div key={item.symbol} className="border border-gray-800 rounded p-1 bg-gray-900/30 hover:bg-white/5 transition-colors">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[8px] font-bold text-white flex items-center gap-1">
-                      <span className="text-gray-600 text-[8px]">#{idx + 1}</span>
-                      {item.symbol}
-                    </span>
-                    <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${item.score >= 80 ? 'bg-neonGreen/20 text-neonGreen border border-neonGreen/30' : 'bg-neonAmber/20 text-neonAmber border border-neonAmber/30'}`}>
-                      Score: {item.score}/100
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 text-[8px]">
-                    <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
-                      <div className="text-gray-500 mb-0.5">P/E Ratio</div>
-                      <div className="font-mono text-gray-300">{item.pe} <span className="text-[8px] text-gray-600 ml-1">(Undervalued)</span></div>
-                    </div>
-                    <div className="bg-black/20 p-1.5 rounded border border-gray-800/50">
-                      <div className="text-gray-500 mb-0.5">Rev Growth</div>
-                      <div className="font-mono text-neonGreen">{item.revGrowth} <span className="text-[8px] text-gray-600 ml-1">(Growing)</span></div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-right">
-                    <span className={`text-[8px] font-bold uppercase tracking-wide ${item.signal.includes('Buy') ? 'text-neonGreen' : 'text-neonAmber'}`}>
-                      👉 {item.signal}
-                    </span>
-                  </div>
-                </div>
+            
+            <div className="flex border-b border-gray-800/60">
+              {['PE', 'ROE', 'DEBT', 'GROWTH', 'TECH'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setScreenerTab(tab)}
+                  className={`flex-1 text-[8px] py-1 font-bold tracking-widest transition-colors ${screenerTab === tab ? 'bg-white/10 text-neonAmber border-b-2 border-neonAmber' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300'}`}
+                >
+                  {tab}
+                </button>
               ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-1 space-y-2">
+              {screenerData.length === 0 ? (
+                <p className="text-[8px] text-gray-600 mt-4 text-center">Loading advanced metrics...</p>
+              ) : (() => {
+                let filtered = [];
+                let description = '';
+                if (screenerTab === 'PE') {
+                  filtered = screenerData.filter(s => s.isPeHealthy).slice(0, 5);
+                  description = "Healthy P/E Ratio (10-25x)";
+                } else if (screenerTab === 'ROE') {
+                  filtered = screenerData.filter(s => s.isRoeGood).slice(0, 5);
+                  description = "Strong ROE (>15%)";
+                } else if (screenerTab === 'DEBT') {
+                  filtered = screenerData.filter(s => s.isDebtLow).slice(0, 5);
+                  description = "Low Debt to Equity (<0.5)";
+                } else if (screenerTab === 'GROWTH') {
+                  filtered = screenerData.filter(s => s.isGrowthStrong).slice(0, 5);
+                  description = "High Revenue & Profit Growth";
+                } else if (screenerTab === 'TECH') {
+                  filtered = screenerData.filter(s => s.isTechnicalBuy).slice(0, 5);
+                  description = "RSI < 30 OR MACD Positive";
+                }
+
+                return (
+                  <>
+                    <div className="text-[8px] text-center text-gray-500 mb-2 italic">Showing: {description}</div>
+                    {filtered.length === 0 ? <p className="text-[8px] text-center text-gray-500 mt-2">No stocks fit criteria.</p> : null}
+                    {filtered.map(item => (
+                      <div key={item.symbol} className="border border-gray-800 rounded p-1.5 bg-gray-900/30 hover:bg-white/5 transition-colors cursor-pointer group" onClick={() => {
+                        setChartQuery(item.symbol);
+                        const match = suggestions.find(s => s.symbol === item.symbol) || { symbol: item.symbol, name: item.symbol, tradingViewSymbol: `NSE:${item.symbol}` };
+                        setSelectedSuggestion(match);
+                        addChartTab();
+                      }}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-bold text-white group-hover:text-neonAmber transition-colors">
+                            {item.symbol}
+                          </span>
+                          <span className="text-[8px] px-1.5 py-0.5 rounded font-bold bg-neonGreen/20 text-neonGreen border border-neonGreen/30">
+                            MATCH
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 text-[8px]">
+                          {screenerTab === 'PE' && (
+                            <>
+                              <div className="text-gray-500">P/E Ratio: <span className="text-white font-mono">{item.pe.toFixed(2)}x</span></div>
+                              <div className="text-gray-500">EPS: <span className="text-neonGreen">Growing</span></div>
+                            </>
+                          )}
+                          {screenerTab === 'ROE' && (
+                            <>
+                              <div className="text-gray-500">ROE: <span className="text-white font-mono">{item.roe.toFixed(2)}%</span></div>
+                              <div className="text-gray-500">Promoter: <span className="text-white font-mono">{item.promoterHolding}%</span></div>
+                            </>
+                          )}
+                          {screenerTab === 'DEBT' && (
+                            <>
+                              <div className="text-gray-500">Debt/Eq: <span className="text-white font-mono">{item.debtToEquity.toFixed(2)}</span></div>
+                              <div className="text-gray-500">FCF: <span className="text-neonGreen">Positive</span></div>
+                            </>
+                          )}
+                          {screenerTab === 'GROWTH' && (
+                            <>
+                              <div className="text-gray-500">Rev Growth: <span className="text-neonGreen font-mono">+{item.revenueGrowth.toFixed(1)}%</span></div>
+                              <div className="text-gray-500">Profit Growth: <span className="text-neonGreen font-mono">+{item.profitGrowth.toFixed(1)}%</span></div>
+                            </>
+                          )}
+                          {screenerTab === 'TECH' && (
+                            <>
+                              <div className="text-gray-500">RSI: <span className="text-white font-mono">{item.rsi.toFixed(2)}</span></div>
+                              <div className="text-gray-500">MACD: <span className={item.macdPositive ? 'text-neonGreen' : 'text-neonRed'}>{item.macdPositive ? 'Positive' : 'Negative'}</span></div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
             </div>
           </div>
 
