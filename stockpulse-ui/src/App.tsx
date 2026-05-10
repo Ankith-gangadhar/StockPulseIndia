@@ -37,7 +37,7 @@ const defaultLayout = [
   { i: 'risk', x: 4, y: 6, w: 1, h: 2, minW: 1, minH: 1 },
 ];
 
-const API_BASE = 'https://stockpulseindia.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:5200';
 const MAX_CHARTS = 10;
 const TIMEFRAMES = ['15m', '1h', '6h', '1d', '1w', '1m', '6m', '1y', '3y', '5y'] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
