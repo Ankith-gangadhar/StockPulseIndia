@@ -333,7 +333,7 @@ function App() {
 
                 <div className="flex-1 overflow-y-auto p-1 space-y-1">
                   {chartTabs.map((tab) => (
-                    <div key={tab.id} className="w-full h-48 border border-gray-800 bg-black relative rounded overflow-hidden">
+                    <div key={tab.id} className="w-full h-[350px] shrink-0 border border-gray-800 bg-black relative rounded overflow-hidden">
                       <div className="absolute top-1 left-1 z-10 px-1 bg-black/80 rounded border border-gray-800 text-xs text-gray-400 font-bold">
                         {tab.symbol} • {tab.timeframe}
                       </div>
