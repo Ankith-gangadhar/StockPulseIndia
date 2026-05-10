@@ -221,7 +221,7 @@ function App() {
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-neonGreen animate-pulse" />
           <h1 className="text-lg font-bold tracking-widest text-white">
-            STOCK<span className="text-neonAmber">PULSE</span> <span className="text-gray-500">INDIA</span>
+            STOCK<span className="text-neonAmber">PULSE</span> <span className="text-gray-500">ANKITH</span>
           </h1>
         </div>
         <div className="flex items-center gap-4 text-xs text-gray-500">
