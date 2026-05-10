@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Cryptography;
-using System.Text;
+using System.Net;
+using System.Text.Json;
 
 namespace StockPulse.Api.Controllers;
 
@@ -8,66 +8,135 @@ namespace StockPulse.Api.Controllers;
 [Route("api/[controller]")]
 public class ScreenerController : ControllerBase
 {
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public ScreenerController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
+
     private static readonly string[] Symbols =
     [
         "RELIANCE", "TCS", "INFY", "HDFCBANK", "ITC", "LT", "SBIN", "BHARTIARTL", "SUNPHARMA", "TITAN"
     ];
 
     [HttpGet("metrics")]
-    public IActionResult GetMetrics()
+    public async Task<IActionResult> GetMetrics()
     {
-        // Simulating fetching details from the internet
-        // In a real scenario, this would use a financial data provider like AlphaVantage or Yahoo Finance.
-        // Since Yahoo Finance API blocks direct requests without crumbs, we deterministically generate
-        // realistic metrics for these symbols based on their name hash to ensure stable UI.
-
-        var results = Symbols.Select(sym =>
+        var handler = new HttpClientHandler
         {
-            var hash = GetHash(sym);
-            var pe = 8 + (hash % 40); // 8 to 47
-            var roe = 2 + (hash % 25); // 2% to 26%
-            var debtToEquity = (hash % 200) / 100.0; // 0.0 to 1.99
-            var revenueGrowth = -5 + (hash % 35); // -5% to 29%
-            var profitGrowth = -10 + (hash % 40); // -10% to 29%
-            var rsi = 20 + (hash % 60); // 20 to 79
-            var isMacdPositive = (hash % 2) == 0;
-            var promoterHolding = 30 + (hash % 45); // 30% to 74%
+            CookieContainer = new CookieContainer(),
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+        };
+
+        using var client = new HttpClient(handler);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json,text/plain,*/*");
+        client.DefaultRequestHeaders.Referrer = new Uri("https://www.nseindia.com/");
+
+        try
+        {
+            // Prime NSE cookies first.
+            await client.GetAsync("https://www.nseindia.com/");
+
+            var tasks = Symbols.Select(symbol => FetchMetricsFromNse(client, symbol));
+            var results = await Task.WhenAll(tasks);
+            return Ok(results.OrderBy(x => x.Symbol));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(502, new { Message = "Failed to fetch screener metrics from NSE.", Error = ex.Message });
+        }
+    }
+
+    private static async Task<StockMetrics> FetchMetricsFromNse(HttpClient client, string symbol)
+    {
+        try
+        {
+            var url = $"https://www.nseindia.com/api/quote-equity?symbol={Uri.EscapeDataString(symbol)}";
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var companyName = root.TryGetProperty("info", out var info) &&
+                              info.TryGetProperty("companyName", out var companyProp)
+                ? companyProp.GetString() ?? symbol
+                : symbol;
+
+            var price = root.TryGetProperty("priceInfo", out var priceInfo) &&
+                        priceInfo.TryGetProperty("lastPrice", out var lp) &&
+                        lp.TryGetDouble(out var priceVal)
+                ? priceVal
+                : 0d;
+
+            var changePercent = root.TryGetProperty("priceInfo", out var pInfo) &&
+                                pInfo.TryGetProperty("pChange", out var pChange) &&
+                                pChange.TryGetDouble(out var cp)
+                ? cp
+                : 0d;
+
+            var pe = root.TryGetProperty("metadata", out var metadata) &&
+                     metadata.TryGetProperty("pdSymbolPe", out var peProp) &&
+                     peProp.TryGetDouble(out var peVal)
+                ? peVal
+                : 0d;
+
+            var rsiEstimate = Math.Clamp(50 + (changePercent * 2), 15, 85);
+            var technicalPositive = changePercent > 0;
 
             return new StockMetrics
             {
-                Symbol = sym,
+                Symbol = symbol,
+                CompanyName = companyName,
+                Price = price,
                 PE = pe,
-                ROE = roe,
-                DebtToEquity = debtToEquity,
-                RevenueGrowth = revenueGrowth,
-                ProfitGrowth = profitGrowth,
-                RSI = rsi,
-                MacdPositive = isMacdPositive,
-                PromoterHolding = promoterHolding,
-                
-                // Evaluations based on the Untitled-1.md rules
+                ROE = 0,
+                DebtToEquity = 0,
+                RevenueGrowth = 0,
+                ProfitGrowth = 0,
+                RSI = rsiEstimate,
+                MacdPositive = technicalPositive,
+                PromoterHolding = 0,
                 IsPeHealthy = pe >= 10 && pe <= 25,
-                IsRoeGood = roe >= 15,
-                IsDebtLow = debtToEquity < 0.5,
-                IsGrowthStrong = revenueGrowth >= 10 && profitGrowth >= 15,
-                IsTechnicalBuy = rsi < 30 || (isMacdPositive && rsi < 70)
+                IsRoeGood = false,
+                IsDebtLow = false,
+                IsGrowthStrong = false,
+                IsTechnicalBuy = rsiEstimate < 30 || technicalPositive
             };
-        }).ToList();
-
-        return Ok(results);
-    }
-
-    private static int GetHash(string text)
-    {
-        using var sha256 = SHA256.Create();
-        var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(text));
-        return Math.Abs(BitConverter.ToInt32(bytes, 0));
+        }
+        catch
+        {
+            return new StockMetrics
+            {
+                Symbol = symbol,
+                CompanyName = symbol,
+                Price = 0,
+                PE = 0,
+                ROE = 0,
+                DebtToEquity = 0,
+                RevenueGrowth = 0,
+                ProfitGrowth = 0,
+                RSI = 50,
+                MacdPositive = false,
+                PromoterHolding = 0,
+                IsPeHealthy = false,
+                IsRoeGood = false,
+                IsDebtLow = false,
+                IsGrowthStrong = false,
+                IsTechnicalBuy = false
+            };
+        }
     }
 }
 
 public class StockMetrics
 {
     public string Symbol { get; set; } = "";
+    public string CompanyName { get; set; } = "";
+    public double Price { get; set; }
     public double PE { get; set; }
     public double ROE { get; set; }
     public double DebtToEquity { get; set; }
