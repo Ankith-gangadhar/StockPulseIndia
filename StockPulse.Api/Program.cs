@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient();
+builder.Services.AddMemoryCache();
 
 // Configure PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
