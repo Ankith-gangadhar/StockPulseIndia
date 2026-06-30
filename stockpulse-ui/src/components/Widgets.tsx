@@ -1,6 +1,11 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { useState, useEffect, useCallback } from 'react';
+import MetricTooltip from './ui/MetricTooltip';
+import WidgetSkeleton from './ui/WidgetSkeleton';
+import WidgetError from './ui/WidgetError';
+import StaleDataBadge from './ui/StaleDataBadge';
+import { useMarketPolling } from '../hooks/useMarketPolling';
 import {
   getScreener,
   clearApiCache,
@@ -28,7 +33,15 @@ export const LiveQuotesWidget = () => {
   const [, setPrevPrices] = useState<Record<string, number>>({});
   const [flashClasses, setFlashClasses] = useState<Record<string, string>>({});
 
-  const fetchAll = async () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const { pollInterval } = useMarketPolling();
+
+  const fetchAll = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError(null);
     try {
       const status = await getMarketStatus();
       setMarketStatus(status);
@@ -84,25 +97,25 @@ export const LiveQuotesWidget = () => {
 
       setStocks(validStocks);
       setNifty(niftyRes);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error("Error fetching live quotes", err);
+      setError("Could not retrieve market quotes");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAll();
+    fetchAll(false);
+  }, []);
 
-    let intervalId: any = null;
-    if (marketStatus?.isOpen) {
-      intervalId = setInterval(() => {
-        fetchAll();
-      }, 60000);
+  useEffect(() => {
+    if (pollInterval > 0) {
+      const id = setInterval(() => fetchAll(true), pollInterval);
+      return () => clearInterval(id);
     }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [marketStatus?.isOpen]);
+  }, [pollInterval]);
 
   const formatNextOpen = (isoString: string | null): string => {
     if (!isoString) return "—";
@@ -121,6 +134,28 @@ export const LiveQuotesWidget = () => {
       return isoString;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+        </div>
+        <WidgetSkeleton rows={6} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+        </div>
+        <WidgetError message={error} onRetry={() => fetchAll(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col overflow-hidden">
@@ -141,8 +176,11 @@ export const LiveQuotesWidget = () => {
       `}} />
 
       {/* Header */}
-      <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+      <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+          {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
+        </div>
         {marketStatus?.isOpen ? (
           <span className="text-xs bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Open
@@ -174,19 +212,19 @@ export const LiveQuotesWidget = () => {
         {marketStatus && !marketStatus.isOpen && (
           <div className="p-2 bg-gray-950/60 border border-gray-850 rounded text-center font-mono space-y-1">
             <div className="inline-block px-1.5 py-0.5 rounded bg-gray-900 text-gray-400 border border-gray-800 font-bold text-[9px]">
-              MARKET CLOSED
+              MARKET IS CLOSED
             </div>
-            <div className="text-[9px] text-gray-500">
-              Next open: {formatNextOpen(marketStatus.nextOpenIst)}
+            <div className="text-[8px] text-gray-500">
+              Opens: {formatNextOpen(marketStatus.nextOpenUtc)}
             </div>
           </div>
         )}
 
         {/* Stock List */}
         {stocks.length === 0 ? (
-          <p className="text-xs text-gray-600 mt-4 text-center">Loading stock data...</p>
+          <div className="text-center text-xs text-gray-500 py-6 font-mono">No quote data available</div>
         ) : (
-          stocks.map(stock => {
+          stocks.map((stock) => {
             const isUp = (stock.changePercent ?? 0) >= 0;
             const flashClass = flashClasses[stock.symbol] || "";
             return (
@@ -195,8 +233,8 @@ export const LiveQuotesWidget = () => {
                 className={`flex justify-between items-center py-1.5 px-2 border-b border-gray-850 hover:bg-white/5 rounded transition-colors group ${flashClass}`}
               >
                 <div>
-                  <div className="text-xs font-bold text-white group-hover:text-neonAmber transition-colors">{stock.symbol}</div>
-                  <div className="text-[9px] text-gray-500 truncate max-w-[120px]">{stock.sector || "NIFTY Stock"}</div>
+                  <div className="text-xs font-bold text-white group-hover:text-neonAmber transition-colors font-mono">{stock.symbol}</div>
+                  <div className="text-[9px] text-gray-500 truncate max-w-[120px] font-mono">{stock.sector || "NIFTY Stock"}</div>
                 </div>
                 <div className="text-right font-mono">
                   <div className="text-xs text-white">
@@ -223,9 +261,13 @@ export const SmartWatchlistWidget = () => {
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [newSymbol, setNewSymbol] = useState("");
   const [addError, setAddError] = useState("");
   const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
+
+  const { pollInterval } = useMarketPolling();
 
   useEffect(() => {
     const stored = localStorage.getItem("stockpulse_watchlist");
@@ -242,13 +284,14 @@ export const SmartWatchlistWidget = () => {
     setWatchlist(list);
   }, []);
 
-  const fetchDetails = async (symbolsList: string[]) => {
+  const fetchDetails = async (symbolsList: string[], isSilent = false) => {
     if (symbolsList.length === 0) {
       setItems([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!isSilent) setLoading(true);
+    setError(null);
     try {
       const status = await getMarketStatus();
       setMarketStatus(status);
@@ -299,8 +342,10 @@ export const SmartWatchlistWidget = () => {
       });
 
       setItems(sorted);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error("Watchlist fetch error", err);
+      setError("Could not retrieve watchlist details");
     } finally {
       setLoading(false);
     }
@@ -308,21 +353,18 @@ export const SmartWatchlistWidget = () => {
 
   useEffect(() => {
     if (watchlist.length >= 0) {
-      fetchDetails(watchlist);
+      fetchDetails(watchlist, false);
     }
   }, [watchlist]);
 
   useEffect(() => {
-    let interval: any = null;
-    if (marketStatus?.isOpen && watchlist.length > 0) {
-      interval = setInterval(() => {
-        fetchDetails(watchlist);
-      }, 5 * 60_000);
+    if (pollInterval > 0 && watchlist.length > 0) {
+      const id = setInterval(() => {
+        fetchDetails(watchlist, true);
+      }, pollInterval);
+      return () => clearInterval(id);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [marketStatus?.isOpen, watchlist]);
+  }, [pollInterval, watchlist]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,16 +400,34 @@ export const SmartWatchlistWidget = () => {
     }
   };
 
+  if (loading && items.length === 0) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
+        </div>
+        <WidgetSkeleton rows={4} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
+        </div>
+        <WidgetError message={error} onRetry={() => fetchDetails(watchlist, false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5">
           <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
-          {marketStatus?.isOpen ? (
-            <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1 py-0.2 rounded font-bold uppercase shrink-0">LIVE</span>
-          ) : (
-            <span className="text-[8px] bg-gray-850 text-gray-500 border border-gray-800 px-1 py-0.2 rounded font-bold uppercase shrink-0">STATIC</span>
-          )}
+          {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
         <form onSubmit={handleAdd} className="flex items-center gap-1">
           <input
@@ -388,9 +448,7 @@ export const SmartWatchlistWidget = () => {
       )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2 font-mono text-[10px]">
-        {loading && items.length === 0 ? (
-          <p className="text-gray-600 text-center py-4">Syncing watchlist metrics...</p>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-gray-500 text-center py-4">Watchlist is empty</p>
         ) : (
           items.map(item => {
@@ -439,34 +497,40 @@ export const SmartWatchlistWidget = () => {
                   )}
 
                   {item.peRatio !== null ? (
-                    <span className={`px-1 py-0.2 rounded border text-[8px] font-bold ${
-                      item.peRatio < 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
-                      item.peRatio <= 35 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
-                      "text-neonRed bg-neonRed/10 border-neonRed/20"
-                    }`}>
-                      PE: {item.peRatio.toFixed(1)}x
-                    </span>
+                    <MetricTooltip content={`P/E Ratio: You pay ₹${item.peRatio.toFixed(1)} for every ₹1 earned. Lower is generally better.`} position="top">
+                      <span className={`px-1 py-0.2 rounded border text-[8px] font-bold cursor-help ${
+                        item.peRatio < 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
+                        item.peRatio <= 35 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
+                        "text-neonRed bg-neonRed/10 border-neonRed/20"
+                      }`}>
+                        PE: {item.peRatio.toFixed(1)}x
+                      </span>
+                    </MetricTooltip>
                   ) : null}
 
                   {item.roe !== null ? (
-                    <span className={`px-1 py-0.2 rounded border text-[8px] font-bold ${
-                      item.roe > 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
-                      item.roe >= 15 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
-                      "text-neonRed bg-neonRed/10 border-neonRed/20"
-                    }`}>
-                      ROE: {item.roe.toFixed(1)}%
-                    </span>
+                    <MetricTooltip content={`Return on Equity: Company earns ${item.roe.toFixed(1)}% per year on its own money. Above 15% is good.`} position="top">
+                      <span className={`px-1 py-0.2 rounded border text-[8px] font-bold cursor-help ${
+                        item.roe > 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
+                        item.roe >= 15 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
+                        "text-neonRed bg-neonRed/10 border-neonRed/20"
+                      }`}>
+                        ROE: {item.roe.toFixed(1)}%
+                      </span>
+                    </MetricTooltip>
                   ) : null}
 
                   {item.rsi !== null ? (
-                    <span className={`px-1 py-0.2 rounded border text-[8px] font-bold ${
-                      item.rsi < 35 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
-                      item.rsi <= 50 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
-                      item.rsi > 70 ? "text-neonRed bg-neonRed/10 border-neonRed/20" :
-                      "text-gray-400 bg-gray-900 border-gray-800"
-                    }`}>
-                      RSI: {item.rsi.toFixed(0)}
-                    </span>
+                    <MetricTooltip content={`RSI ${item.rsi.toFixed(0)}: Momentum relative strength index. Below 30 is oversold, above 70 is overbought.`} position="top">
+                      <span className={`px-1 py-0.2 rounded border text-[8px] font-bold cursor-help ${
+                        item.rsi < 35 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
+                        item.rsi <= 50 ? "text-neonAmber bg-neonAmber/10 border-neonAmber/20" :
+                        item.rsi > 70 ? "text-neonRed bg-neonRed/10 border-neonRed/20" :
+                        "text-gray-400 bg-gray-900 border-gray-800"
+                      }`}>
+                        RSI: {item.rsi.toFixed(0)}
+                      </span>
+                    </MetricTooltip>
                   ) : null}
                 </div>
               </div>
@@ -481,19 +545,21 @@ export const SmartWatchlistWidget = () => {
 export const BuyTodayWidget = () => {
   const [signals, setSignals] = useState<BuySignal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [minutesAgo, setMinutesAgo] = useState(0);
 
+  const { pollInterval } = useMarketPolling();
+
   const fetchSignals = async () => {
     setLoading(true);
-    setError(false);
+    setError(null);
     try {
       const data = await getBuySignals();
       setSignals(data);
       setLastUpdated(new Date());
     } catch {
-      setError(true);
+      setError("Could not score buy signals");
     } finally {
       setLoading(false);
     }
@@ -501,11 +567,16 @@ export const BuyTodayWidget = () => {
 
   useEffect(() => {
     fetchSignals();
-    const interval = setInterval(() => {
-      fetchSignals();
-    }, 5 * 60_000);
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (pollInterval > 0) {
+      const id = setInterval(() => {
+        fetchSignals();
+      }, pollInterval);
+      return () => clearInterval(id);
+    }
+  }, [pollInterval]);
 
   useEffect(() => {
     if (!lastUpdated) return;
@@ -521,32 +592,40 @@ export const BuyTodayWidget = () => {
     fetchSignals();
   };
 
+  if (loading && signals.length === 0) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+        </div>
+        <WidgetSkeleton rows={4} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+        </div>
+        <WidgetError message={error} onRetry={fetchSignals} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes cursor-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-        .animate-cursor-blink {
-          animation: cursor-blink 1s step-end infinite;
-        }
-      `}} />
-
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+          {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-3 font-mono text-[10px] flex flex-col">
-        {loading ? (
-          <div className="flex justify-center items-center py-8 font-mono text-neonGreen text-xs tracking-widest uppercase">
-            <span>SCANNING MOMENTUM</span>
-            <span className="animate-cursor-blink ml-1">_</span>
-          </div>
-        ) : error ? (
-          <p className="text-neonRed text-center py-4">Scoring failed</p>
-        ) : signals.length === 0 ? (
-          <p className="text-gray-500 text-center py-6 px-2 leading-relaxed font-mono">
+        {signals.length === 0 ? (
+          <p className="text-gray-550 text-center py-6 px-2 leading-relaxed font-mono">
             NO STRONG BUY SETUPS TODAY — Market may be overbought or data is updating. RSI across NIFTY 50 is elevated.
           </p>
         ) : (
@@ -621,12 +700,12 @@ export const BuyTodayWidget = () => {
       </div>
 
       {/* Small disclaimer */}
-      <div className="text-[8px] text-gray-600 text-center px-2 py-1 mt-auto border-t border-gray-850 bg-gray-950/20 select-none">
+      <div className="text-[8px] text-gray-650 text-center px-2 py-1 mt-auto border-t border-gray-850 bg-gray-950/20 select-none">
         Not financial advice. Based on technical + fundamental analysis.
       </div>
 
       {/* Footer */}
-      <div className="border-t border-gray-800 bg-gray-900/40 px-2 py-1 flex justify-between items-center text-[10px] text-gray-500 font-mono select-none">
+      <div className="border-t border-gray-800 bg-gray-900/40 px-2 py-1 flex justify-between items-center text-[10px] text-gray-500 font-mono select-none font-bold">
         <span>Last scanned: {lastUpdated ? `${minutesAgo}m ago` : "never"}</span>
         <button
           onClick={handleRefresh}
@@ -915,25 +994,18 @@ export const NewsSentinelWidget = () => {
                   </div>
                 </div>
               </div>
-            </a>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const FinancialSummaryWidget = () => {
+      export const FinancialSummaryWidget = () => {
   const [activeSymbol, setActiveSymbol] = useState("RELIANCE");
   const [inputVal, setInputVal] = useState("RELIANCE");
   const [fund, setFund] = useState<Fundamentals | null>(null);
   const [quarterly, setQuarterly] = useState<Quarterly | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
-    setError(false);
+    setError(null);
     try {
       const [fData, qData] = await Promise.all([
         getFundamentals(activeSymbol),
@@ -942,11 +1014,12 @@ export const FinancialSummaryWidget = () => {
       if (fData) {
         setFund(fData);
         setQuarterly(qData);
+        setLastUpdated(new Date());
       } else {
-        setError(true);
+        setError(`No financials found for ${activeSymbol}`);
       }
     } catch {
-      setError(true);
+      setError(`Failed to retrieve financials for ${activeSymbol}`);
     } finally {
       setLoading(false);
     }
@@ -982,6 +1055,28 @@ export const FinancialSummaryWidget = () => {
 
   const isBank = ["SBIN", "HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK"].includes(activeSymbol);
 
+  if (loading) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Financials</span>
+        </div>
+        <WidgetSkeleton rows={5} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Financials</span>
+        </div>
+        <WidgetError message={error} onRetry={fetchData} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
       {/* Header with Search */}
@@ -994,6 +1089,7 @@ export const FinancialSummaryWidget = () => {
               {fund.sector}
             </span>
           )}
+          {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
         <form onSubmit={handleSearch} className="flex items-center gap-1 shrink-0">
           <input
@@ -1008,11 +1104,7 @@ export const FinancialSummaryWidget = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-3 font-mono text-[10px]">
-        {loading ? (
-          <p className="text-gray-600 text-center py-4">Fetching financial metrics...</p>
-        ) : error ? (
-          <p className="text-neonRed text-center py-4">No data found for {activeSymbol}</p>
-        ) : (
+        {fund && (
           <>
             {/* Fundamentals Overview */}
             <div>
@@ -1024,10 +1116,12 @@ export const FinancialSummaryWidget = () => {
                 </div>
 
                 {/* PE Ratio */}
-                <div className="flex justify-between items-center relative group/pe border-b border-gray-850/30 py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    PE Ratio <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center border-b border-gray-850/30 py-0.5">
+                  <MetricTooltip content={`P/E Ratio: You pay ₹${fund?.peRatio?.toFixed(1) ?? "—"} for every ₹1 earned. Below 20 is fair. IT stocks can be 30. PSU banks normal at PE 10.`} position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      PE Ratio <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.peRatio === null || fund?.peRatio === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     fund.peRatio < 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
@@ -1036,16 +1130,15 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.peRatio?.toFixed(1) ?? "—"}x
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/pe:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    P/E Ratio: You pay ₹{fund?.peRatio?.toFixed(1) ?? "—"} for every ₹1 earned. Below 20 is fair. IT stocks can be 30. PSU banks are normal at PE 10.
-                  </div>
                 </div>
 
                 {/* ROE */}
-                <div className="flex justify-between items-center relative group/roe border-b border-gray-850/30 py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    ROE <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center border-b border-gray-850/30 py-0.5">
+                  <MetricTooltip content={`Return on Equity: Company earns ${fund?.roe?.toFixed(1) ?? "—"}% per year on shareholders' equity. Above 15% is good.`} position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      ROE <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.roe === null || fund?.roe === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     fund.roe > 20 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
@@ -1054,16 +1147,15 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.roe?.toFixed(1) ?? "—"}%
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/roe:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    Return on Equity: Company earns {fund?.roe?.toFixed(1) ?? "—"}% per year on its own money. Above 15% is good, above 20% is excellent.
-                  </div>
                 </div>
 
                 {/* Debt to Equity */}
-                <div className="flex justify-between items-center relative group/de border-b border-gray-850/30 py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    Debt to Equity <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center border-b border-gray-850/30 py-0.5">
+                  <MetricTooltip content={`Debt to Equity: Ratio of total liabilities to shareholders' equity. Below 0.5 is healthy. Banks are excluded.`} position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      Debt to Equity <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.debtToEquity === null || fund?.debtToEquity === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     isBank ? "text-gray-400 bg-gray-900 border-gray-800" :
@@ -1073,16 +1165,15 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.debtToEquity?.toFixed(2) ?? "—"}
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/de:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    Debt to Equity: For every ₹1 of own money this company has ₹{fund?.debtToEquity?.toFixed(2) ?? "—"} of debt. Below 0.5 is healthy. Banks are excluded here.
-                  </div>
                 </div>
 
                 {/* EPS */}
-                <div className="flex justify-between items-center relative group/eps border-b border-gray-850/30 py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    EPS <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center border-b border-gray-850/30 py-0.5">
+                  <MetricTooltip content="Earnings Per Share: Portion of company's profit allocated to each share. Higher is better." position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      EPS <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.eps === null || fund?.eps === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     fund.eps > 0 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
@@ -1090,16 +1181,15 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.eps !== null && fund?.eps !== undefined ? `₹${fund.eps.toFixed(1)}` : "—"}
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/eps:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    Earnings Per Share: The portion of a company's profit allocated to each outstanding share. Higher is better.
-                  </div>
                 </div>
 
                 {/* Dividend Yield */}
-                <div className="flex justify-between items-center relative group/div border-b border-gray-850/30 py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    Div Yield <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center border-b border-gray-850/30 py-0.5">
+                  <MetricTooltip content="Dividend Yield: Annual dividend payments relative to share price. Higher yield means more direct cash return." position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      Div Yield <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.dividendYield === null || fund?.dividendYield === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     fund.dividendYield > 3.0 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
@@ -1108,16 +1198,15 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.dividendYield !== null && fund?.dividendYield !== undefined ? `${fund.dividendYield.toFixed(1)}%` : "—"}
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/div:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    Dividend Yield: Annual dividend payment divided by share price. Higher yield means more cash returned directly to shareholders.
-                  </div>
                 </div>
 
                 {/* Beta */}
-                <div className="flex justify-between items-center relative group/beta py-0.5">
-                  <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
-                    Beta <span className="text-gray-600 text-[8px]">ℹ</span>
-                  </span>
+                <div className="flex justify-between items-center py-0.5">
+                  <MetricTooltip content={`Beta: Volatility relative to index. If NIFTY moves 1%, this stock moves ~${fund?.beta?.toFixed(2) ?? "—"}%. Above 1.3 is highly volatile.`} position="top">
+                    <span className="text-gray-500 cursor-help select-none flex items-center gap-1">
+                      Beta <span className="text-gray-600 text-[8px]">ℹ</span>
+                    </span>
+                  </MetricTooltip>
                   <span className={`px-1 py-0.2 rounded border font-bold ${
                     fund?.beta === null || fund?.beta === undefined ? "text-gray-500 bg-gray-950 border-gray-900" :
                     fund.beta < 0.8 ? "text-neonGreen bg-neonGreen/10 border-neonGreen/20" :
@@ -1126,9 +1215,6 @@ export const FinancialSummaryWidget = () => {
                   }`}>
                     {fund?.beta?.toFixed(2) ?? "—"}
                   </span>
-                  <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/beta:block z-50 bg-gray-950 text-gray-200 text-[9px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                    Beta: If NIFTY moves 1%, this stock moves ~{fund?.beta?.toFixed(2) ?? "—"}%. Above 1.3 = high volatility.
-                  </div>
                 </div>
               </div>
             </div>
@@ -1192,7 +1278,7 @@ export const FinancialSummaryWidget = () => {
                     </table>
                   </div>
                 ) : (
-                  <p className="text-gray-600 text-center py-2">No quarterly details found</p>
+                  <p className="text-gray-650 text-center py-2">No quarterly details found</p>
                 )}
               </div>
             )}
@@ -1209,35 +1295,36 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
   const [fund, setFund] = useState<Fundamentals | null>(null);
   const [tech, setTech] = useState<Technical | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveSymbol(defaultSymbol);
     setInputVal(defaultSymbol);
   }, [defaultSymbol]);
 
-  useEffect(() => {
-    const fetchRiskData = async () => {
-      setLoading(true);
-      setError(false);
-      try {
-        const [fundData, techData] = await Promise.all([
-          getFundamentals(activeSymbol),
-          getTechnical(activeSymbol)
-        ]);
+  const fetchRiskData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [fundData, techData] = await Promise.all([
+        getFundamentals(activeSymbol),
+        getTechnical(activeSymbol)
+      ]);
 
-        if (fundData) {
-          setFund(fundData);
-          setTech(techData);
-        } else {
-          setError(true);
-        }
-      } catch {
-        setError(true);
-      } finally {
-        setLoading(false);
+      if (fundData) {
+        setFund(fundData);
+        setTech(techData);
+      } else {
+        setError(`No risk data found for ${activeSymbol}`);
       }
-    };
+    } catch {
+      setError(`Failed to retrieve risk details for ${activeSymbol}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchRiskData();
   }, [activeSymbol]);
 
@@ -1302,6 +1389,28 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
     warnings.push("No active warnings");
   }
 
+  if (loading) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+        </div>
+        <WidgetSkeleton rows={4} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+        </div>
+        <WidgetError message={error} onRetry={fetchRiskData} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
       {/* Header with Search */}
@@ -1320,11 +1429,7 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 flex flex-col justify-between space-y-2">
-        {loading ? (
-          <p className="text-[10px] text-gray-600 text-center py-4 font-mono">Evaluating risk parameters...</p>
-        ) : error ? (
-          <p className="text-[10px] text-neonRed text-center py-4 font-mono">Evaluation failed for {activeSymbol}</p>
-        ) : (
+        {fund && (
           <>
             <div className="flex flex-col items-center py-1.5 font-mono">
               <span className="text-[10px] uppercase text-gray-500 font-bold tracking-wider mb-1">{activeSymbol} Risk rating</span>
@@ -1335,21 +1440,19 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
 
             <div className="w-full space-y-2 text-[10px] font-mono">
               {/* Beta */}
-              <div className="flex justify-between border-b border-gray-850 pb-1 relative group/risktooltip">
-                <span className="text-gray-500 cursor-help select-none">Beta (vs NIFTY) ℹ</span>
+              <div className="flex justify-between border-b border-gray-850 pb-1">
+                <MetricTooltip content={`Beta measures volatility relative to index. >1 is high risk, <1 is low risk.`} position="top">
+                  <span className="text-gray-500 cursor-help select-none">Beta (vs NIFTY) ℹ</span>
+                </MetricTooltip>
                 <span className="font-mono text-white">{beta !== undefined && beta !== null ? beta.toFixed(2) : "—"}</span>
-                <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/risktooltip:block z-50 bg-gray-950 text-gray-200 rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                  Beta {beta !== undefined && beta !== null ? beta.toFixed(2) : "—"}: If NIFTY moves 1%, this stock moves ~{beta !== undefined && beta !== null ? beta.toFixed(2) : "—"}%. Above 1.3 = high volatility.
-                </div>
               </div>
 
               {/* Volatility */}
-              <div className="flex justify-between border-b border-gray-850 pb-1 relative group/voltooltip">
-                <span className="text-gray-500 cursor-help select-none">30D Volatility ℹ</span>
+              <div className="flex justify-between border-b border-gray-850 pb-1">
+                <MetricTooltip content="Historical standard deviation of daily price changes. Under 20% = low risk, 20–40% = medium, over 40% = high." position="top">
+                  <span className="text-gray-500 cursor-help select-none">30D Volatility ℹ</span>
+                </MetricTooltip>
                 <span className="font-mono text-white">{hasVol ? `${vol.toFixed(1)}%` : "—"}</span>
-                <div className="absolute right-0 bottom-full mb-1.5 hidden group-hover/voltooltip:block z-50 bg-gray-950 text-gray-200 rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                  Annualized volatility from last 30 days. Under 20% = low risk, 20–40% = medium, over 40% = high.
-                </div>
               </div>
 
               {/* Active Warnings */}
@@ -1378,27 +1481,38 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
   const type = tabName.toLowerCase() as "pe" | "roe" | "debt" | "growth" | "tech";
   const [results, setResults] = useState<ScreenerResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [minutesAgo, setMinutesAgo] = useState(0);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(false);
+  const { pollInterval } = useMarketPolling();
+
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError(null);
     try {
       const data = await getScreener(type);
       setResults(data);
       setLastUpdated(new Date());
     } catch {
-      setError(true);
+      setError("Failed to run screen parameters");
     } finally {
       setLoading(false);
     }
   }, [type]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(false);
   }, [fetchData]);
+
+  useEffect(() => {
+    if (pollInterval > 0) {
+      const id = setInterval(() => {
+        fetchData(true);
+      }, pollInterval);
+      return () => clearInterval(id);
+    }
+  }, [pollInterval, fetchData]);
 
   useEffect(() => {
     if (!lastUpdated) return;
@@ -1411,7 +1525,7 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
 
   const handleRefresh = () => {
     clearApiCache();
-    fetchData();
+    fetchData(false);
   };
 
   const getBadgeDetails = (val: number) => {
@@ -1502,91 +1616,97 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
     }
   };
 
+  if (loading && results.length === 0) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+        </div>
+        <WidgetSkeleton rows={4} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+        <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+        </div>
+        <WidgetError message={error} onRetry={() => fetchData(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
       {/* Title Header */}
-      <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
-        <span className="text-xs px-1 py-0.5 rounded bg-neonAmber/10 text-neonAmber border border-neonAmber/20">DATA</span>
+      <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+          {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
+        </div>
+        <span className="text-[8px] px-1 py-0.2 rounded bg-neonAmber/15 text-neonAmber border border-neonAmber/20 font-bold uppercase tracking-wider shrink-0 select-none">DATA</span>
       </div>
 
       {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-1 space-y-2">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[100px] mt-4 animate-pulse">
-            <span className="text-xs text-neonGreen font-bold tracking-widest uppercase">SCANNING NIFTY 50...</span>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center p-4 text-center mt-4">
-            <span className="text-xs text-neonRed font-bold mb-2">⚠ SCAN FAILED — CHECK CONNECTION</span>
-            <button
-              onClick={handleRefresh}
-              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-neonRed/10 text-neonRed border border-neonRed/30 hover:bg-neonRed/20 transition-all rounded"
-            >
-              Retry
-            </button>
-          </div>
+        <div className="text-xs text-center text-gray-500 mb-2 italic px-1 truncate font-mono select-none" title={getScreenerDescription()}>
+          {getScreenerDescription()}
+        </div>
+        {results.length === 0 ? (
+          <p className="text-xs text-center text-gray-500 mt-4 px-2 font-mono">
+            NO MATCHES RIGHT NOW — market conditions don't fit this screen.
+          </p>
         ) : (
-          <>
-            <div className="text-xs text-center text-gray-500 mb-2 italic px-1 truncate" title={getScreenerDescription()}>
-              {getScreenerDescription()}
-            </div>
-            {results.length === 0 ? (
-              <p className="text-xs text-center text-gray-500 mt-4 px-2">
-                NO MATCHES RIGHT NOW — market conditions don't fit this screen.
-              </p>
-            ) : (
-              results.map((item) => {
-                const { badgeColor, tooltipText, formattedValue } = getBadgeDetails(item.metricValue);
-                return (
-                  <div
-                    key={item.symbol}
-                    className="flex justify-between items-center p-1.5 border border-gray-800/40 bg-white/5 hover:bg-white/10 rounded transition-colors group"
-                  >
-                    <div className="overflow-hidden pr-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors truncate">
-                          {item.symbol}
-                        </span>
-                        {item.sector && (
-                          <span className="text-[9px] uppercase px-1 py-0.2 bg-gray-800 text-gray-400 rounded-sm shrink-0 truncate max-w-[80px]">
-                            {item.sector}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate" title={item.symbol}>
-                        {item.symbol} Industries
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-sm font-mono text-neonGreen">
-                        ₹{item.price ? item.price.toFixed(2) : "0.00"}
-                      </div>
-                      
-                      {/* CSS Hover Tooltip on Badge */}
-                      <div className="relative group/tooltip inline-block mt-0.5">
-                        <span className={`text-[10px] px-1 py-0.5 rounded border font-mono select-none cursor-help font-bold ${badgeColor}`}>
-                          {formattedValue}
-                        </span>
-                        <div className="absolute right-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 bg-gray-950 text-gray-200 text-[10px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
-                          {tooltipText}
-                        </div>
-                      </div>
-                    </div>
+          results.map((item) => {
+            const { badgeColor, tooltipText, formattedValue } = getBadgeDetails(item.metricValue);
+            return (
+              <div
+                key={item.symbol}
+                className="flex justify-between items-center p-1.5 border border-gray-850 bg-black/10 hover:bg-white/5 rounded transition-colors group font-mono text-[10px]"
+              >
+                <div className="overflow-hidden pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors truncate">
+                      {item.symbol}
+                    </span>
+                    {item.sector && (
+                      <span className="text-[9px] uppercase px-1 py-0.2 bg-gray-800 text-gray-400 rounded-sm shrink-0 truncate max-w-[80px]">
+                        {item.sector}
+                      </span>
+                    )}
                   </div>
-                );
-              })
-            )}
-          </>
+                  <div className="text-xs text-gray-500 truncate" title={item.symbol}>
+                    {item.symbol} Industries
+                  </div>
+                </div>
+                <div className="text-right shrink-0 flex flex-col items-end">
+                  <div className="text-sm font-mono text-neonGreen">
+                    ₹{item.price ? item.price.toFixed(2) : "0.00"}
+                  </div>
+                  
+                  {/* MetricTooltip on Badge */}
+                  <div className="inline-block mt-0.5">
+                    <MetricTooltip content={tooltipText} position="top">
+                      <span className={`text-[10px] px-1 py-0.5 rounded border font-mono select-none cursor-help font-bold ${badgeColor}`}>
+                        {formattedValue}
+                      </span>
+                    </MetricTooltip>
+                  </div>
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
       {/* Footer */}
-      <div className="mt-auto border-t border-gray-800 bg-gray-900/40 px-2 py-1.5 flex justify-between items-center text-[10px] text-gray-500 font-mono">
+      <div className="mt-auto border-t border-gray-800 bg-gray-900/40 px-2 py-1 flex justify-between items-center text-[10px] text-gray-500 font-mono select-none font-bold">
         <span>Last scanned: {lastUpdated ? `${minutesAgo}m ago` : "never"}</span>
         <button
           onClick={handleRefresh}
-          className="text-neonAmber hover:text-neonGreen transition-colors flex items-center gap-1 focus:outline-none"
+          className="text-neonAmber hover:text-neonGreen transition-colors flex items-center gap-1 focus:outline-none cursor-pointer"
           title="Refresh Data"
         >
           <span>↺</span>

@@ -19,6 +19,8 @@ import {
   RiskMeterWidget,
   ScreenerMetricWidget
 } from './components/Widgets';
+import { FIIDIIWidget } from './components/widgets/FIIDIIWidget';
+import MarketStatusBar from './components/MarketStatusBar';
 
 const defaultLayout = [
   { i: 'quotes', x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1 },
@@ -35,6 +37,7 @@ const defaultLayout = [
   { i: 'insights', x: 3, y: 4, w: 2, h: 2, minW: 1, minH: 1 },
   { i: 'news', x: 3, y: 6, w: 1, h: 2, minW: 1, minH: 1 },
   { i: 'risk', x: 4, y: 6, w: 1, h: 2, minW: 1, minH: 1 },
+  { i: 'fiidii', x: 0, y: 8, w: 1, h: 2, minW: 1, minH: 1 },
 ];
 
 const API_BASE = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
@@ -223,6 +226,7 @@ function App() {
           <span>{new Date().toLocaleTimeString('en-IN', { hour12: false })} IST</span>
         </div>
       </header>
+      <MarketStatusBar />
 
       {mounted && (() => {
         const Grid = ResponsiveGridLayout as any;
@@ -343,6 +347,7 @@ function App() {
             <div key="news" className="h-full"><NewsSentinelWidget /></div>
             <div key="financials" className="h-full"><FinancialSummaryWidget /></div>
             <div key="risk" className="h-full"><RiskMeterWidget /></div>
+            <div key="fiidii" className="h-full"><FIIDIIWidget /></div>
           </Grid>
         );
       })()}
