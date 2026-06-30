@@ -58,3 +58,7 @@ public record BuySignalDto(
 public record QuarterDto(string Date, decimal? TotalRevenue, decimal? NetIncome, decimal? Ebitda);
 public record QuarterlyDto(string Symbol, decimal? RevenueYoY, decimal? NetIncomeYoY, List<QuarterDto> Quarters);
 
+public record NewsItemDto(string Headline, string Source, DateTime PublishedAt, string Url, string Sentiment);
+public record InsightCardDto(string Type, string Title, string Body, string? Symbol);
+public record FiiDiiDto(string Date, decimal FiiNetValue, decimal DiiNetValue);
+

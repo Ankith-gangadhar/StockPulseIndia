@@ -17,6 +17,8 @@ builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<PythonWorkerService>();
 builder.Services.AddResponseCaching();
 builder.Services.AddScoped<BuySignalService>();
+builder.Services.AddSingleton<NewsService>();
+builder.Services.AddSingleton<NseClient>();
 
 // Configure PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");

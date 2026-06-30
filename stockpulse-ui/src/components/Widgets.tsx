@@ -682,54 +682,242 @@ export const FallenStocksWidget = () => {
 };
 
 export const AIInsightsWidget = () => {
-  const { insights, loading } = useSelector((state: RootState) => state.dashboard);
+  const [insights, setInsights] = useState<InsightCard[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await getInsights();
+      setInsights(data);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(() => {
+      fetchData();
+    }, 10 * 60_000); // 10 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  const getTypeDetails = (type: string) => {
+    switch (type.toUpperCase()) {
+      case "BULLISH":
+        return { icon: "▲", colorClass: "text-neonGreen border-neonGreen/20 bg-neonGreen/5" };
+      case "BEARISH":
+        return { icon: "▼", colorClass: "text-neonRed border-neonRed/20 bg-neonRed/5" };
+      case "WARNING":
+        return { icon: "⚠", colorClass: "text-neonAmber border-neonAmber/20 bg-neonAmber/5" };
+      case "WATCH":
+        return { icon: "👁", colorClass: "text-cyan-400 border-cyan-900/30 bg-cyan-950/20" };
+      default:
+        return { icon: "•", colorClass: "text-gray-400 border-gray-800 bg-gray-900/30" };
+    }
+  };
+
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .staggered-insight-card {
+          animation: fadeInUp 0.3s ease-out forwards;
+          opacity: 0;
+        }
+      `}} />
+
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
         <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">AI Insights</span>
         <span className="text-xs text-neonAmber font-bold">ALERT</span>
       </div>
-      <div className="flex-1 overflow-y-auto p-1 space-y-3">
-        {loading && <p className="text-xs text-gray-600 mt-2">Initializing AI models...</p>}
-        {insights.map((insight: any, idx: number) => (
-          <div key={idx} className="border-l-2 pl-2 py-1" style={{ borderColor: insight.sentiment === 'Bullish' ? '#00ff41' : insight.sentiment === 'Bearish' ? '#ff003c' : '#ffb000' }}>
-            <div className="text-xs font-bold uppercase text-gray-500">{insight.type}</div>
-            <div className="text-xs text-gray-200 mt-0.5">{insight.message}</div>
-            <div className={`text-xs mt-1 font-bold ${insight.sentiment === 'Bullish' ? 'text-neonGreen' : insight.sentiment === 'Bearish' ? 'text-neonRed' : 'text-neonAmber'}`}>
-              {insight.sentiment}
-            </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-2.5 flex flex-col">
+        {loading ? (
+          <p className="text-xs text-gray-650 mt-2 font-mono text-center">Assembling market insights...</p>
+        ) : error ? (
+          <p className="text-xs text-neonRed mt-2 font-mono text-center">Failed to load insights</p>
+        ) : insights.length === 0 ? (
+          <p className="text-xs text-gray-500 mt-2 font-mono text-center">No daily insights generated</p>
+        ) : (
+          <div className="space-y-2.5">
+            {insights.map((item, idx) => {
+              const { icon, colorClass } = getTypeDetails(item.type);
+              return (
+                <div
+                  key={idx}
+                  className={`p-2 border rounded font-mono staggered-insight-card ${colorClass}`}
+                  style={{ animationDelay: `${idx * 85}ms` }}
+                >
+                  <div className="flex items-center gap-1.5 font-bold mb-1">
+                    <span className="text-xs">{icon}</span>
+                    <span className="text-white text-[10px] uppercase tracking-wider">{item.title}</span>
+                  </div>
+                  <div className="text-[9px] text-gray-300 leading-normal">{item.body}</div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Subtle disclaimer */}
+      <div className="text-[8px] text-gray-600 text-center px-2 py-1 mt-auto border-t border-gray-850 bg-gray-950/20 select-none">
+        Not financial advice. Rules-based market evaluation.
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-800 bg-gray-900/40 px-2 py-1 flex justify-between items-center text-[8px] text-gray-500 font-mono select-none font-bold">
+        <span>Generated from live market data • updates every 10 min</span>
+        <button
+          onClick={fetchData}
+          className="text-neonAmber hover:text-neonGreen transition-colors flex items-center gap-1 focus:outline-none cursor-pointer font-bold text-[9px]"
+          title="Refresh Insights"
+        >
+          <span>↺</span>
+          <span className="uppercase tracking-wider">Refresh</span>
+        </button>
       </div>
     </div>
   );
 };
 
 export const NewsSentinelWidget = () => {
-  const { news, loading } = useSelector((state: RootState) => state.dashboard);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchNews = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await getNews();
+      setNews(data);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNews();
+    const interval = setInterval(() => {
+      fetchNews();
+    }, 3 * 60_000); // 3 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  const posCount = news.filter(n => n.sentiment === "POSITIVE").length;
+  const negCount = news.filter(n => n.sentiment === "NEGATIVE").length;
+
+  const formatTimeAgo = (publishedAtStr: string): string => {
+    try {
+      const published = new Date(publishedAtStr);
+      const diffMs = Date.now() - published.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 5) return "just now";
+      if (diffMin < 60) return `${diffMin} min ago`;
+      const diffHours = Math.floor(diffMin / 60);
+      if (diffHours < 24) return `${diffHours} hours ago`;
+      return "yesterday";
+    } catch {
+      return "—";
+    }
+  };
+
+  const getSourceStyle = (source: string): string => {
+    switch (source.toUpperCase()) {
+      case "ET":
+        return "text-yellow-500 bg-yellow-950/30 border-yellow-900/30";
+      case "MC":
+        return "text-cyan-500 bg-cyan-950/30 border-cyan-900/30";
+      case "BS":
+        return "text-purple-500 bg-purple-950/30 border-purple-900/30";
+      default:
+        return "text-gray-400 bg-gray-900 border-gray-800";
+    }
+  };
+
+  const getSentimentDot = (sentiment: string) => {
+    switch (sentiment.toUpperCase()) {
+      case "POSITIVE": return "bg-neonGreen";
+      case "NEGATIVE": return "bg-neonRed";
+      default: return "bg-gray-600";
+    }
+  };
+
+  const truncateHeadline = (headline: string): string => {
+    if (headline.length <= 85) return headline;
+    return headline.slice(0, 82) + "...";
+  };
+
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden font-mono text-[10px]">
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">News Sentinel</span>
-          <span className="text-xs bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
-          </span>
+          <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1 py-0.2 rounded font-bold uppercase shrink-0 animate-pulse">LIVE</span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-1 space-y-2">
-        {loading && <p className="text-xs text-gray-600 mt-2">Scanning headlines...</p>}
-        {news.map((n: any, idx: number) => (
-          <div key={idx} className="py-2 border-b border-gray-800/50 hover:bg-white/5 px-1 rounded cursor-pointer">
-            <div className="text-xs text-gray-200">{n.headline}</div>
-            <div className="flex justify-between items-center mt-1">
-              <span className={`text-xs uppercase font-bold px-1.5 py-0.5 rounded ${n.impact === 'Positive' ? 'bg-neonGreen/15 text-neonGreen' : 'bg-neonRed/15 text-neonRed'}`}>
-                {n.impact}
-              </span>
-              <span className="text-xs text-gray-600">{n.time}</span>
-            </div>
-          </div>
-        ))}
+
+      {/* Sentiment Summary Header */}
+      {!loading && !error && news.length > 0 && (
+        <div className="px-2 py-1 bg-gray-900/40 border-b border-gray-850 text-gray-400 font-bold text-[9px] select-none text-center">
+          📈 {posCount} positive • 📉 {negCount} negative today
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-1.5 space-y-2">
+        {loading ? (
+          <p className="text-gray-600 text-center py-4">Scanning news feeds...</p>
+        ) : error ? (
+          <p className="text-neonRed text-center py-4">Failed to load news</p>
+        ) : news.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No recent market news found</p>
+        ) : (
+          news.map((n, idx) => (
+            <a
+              key={idx}
+              href={n.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block p-1.5 border border-gray-850 bg-black/10 rounded hover:bg-white/5 transition-colors group cursor-pointer"
+            >
+              <div className="flex items-start gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${getSentimentDot(n.sentiment)}`} />
+                <div className="flex-1 min-w-0">
+                  <div
+                    className="text-gray-200 group-hover:text-white transition-colors leading-normal"
+                    title={n.headline}
+                  >
+                    {truncateHeadline(n.headline)}
+                  </div>
+                  <div className="flex justify-between items-center mt-1 select-none text-[8px]">
+                    <span className={`px-1 py-0.2 rounded border uppercase font-bold text-[8px] ${getSourceStyle(n.source)}`}>
+                      {n.source}
+                    </span>
+                    <span className="text-gray-500">{formatTimeAgo(n.publishedAt)}</span>
+                  </div>
+                </div>
+              </div>
+            </a>
+          ))
+        )}
       </div>
     </div>
   );

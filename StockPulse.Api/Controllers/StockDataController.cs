@@ -108,6 +108,126 @@ public class StockDataController : ControllerBase
         return d is null ? NotFound() : Ok(d);
     }
 
+    [HttpGet("market/fiidii")]
+    [ResponseCache(Duration = 600)]
+    public async Task<IActionResult> FiiDii([FromServices] NseClient nse, [FromServices] ILogger<StockDataController> log)
+    {
+        var json = await nse.GetJsonAsync("/api/fiidiiTradeReact");
+        if (json is null) return Ok(new List<FiiDiiDto>());
+        
+        log.LogInformation("Raw FII/DII JSON: {Json}", json);
+
+        var list = new List<FiiDiiDto>();
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var el in doc.RootElement.EnumerateArray())
+                {
+                    var date = GetStringValue(el, "date", "Date");
+                    if (string.IsNullOrWhiteSpace(date)) continue;
+
+                    var fiiNet = GetDecimalValue(el, "fiiNet", "fiiNetValue", "fiiNetValueRupeesCrore", "fiiNetPurchaseSales");
+                    if (fiiNet == null)
+                    {
+                        var buy = GetDecimalValue(el, "fiiBuy", "fiiBuyValue");
+                        var sell = GetDecimalValue(el, "fiiSell", "fiiSellValue");
+                        if (buy != null && sell != null) fiiNet = buy.Value - sell.Value;
+                    }
+
+                    var diiNet = GetDecimalValue(el, "diiNet", "diiNetValue", "diiNetValueRupeesCrore", "diiNetPurchaseSales");
+                    if (diiNet == null)
+                    {
+                        var buy = GetDecimalValue(el, "diiBuy", "diiBuyValue");
+                        var sell = GetDecimalValue(el, "diiSell", "diiSellValue");
+                        if (buy != null && sell != null) diiNet = buy.Value - sell.Value;
+                    }
+
+                    if (fiiNet != null || diiNet != null)
+                    {
+                        list.Add(new FiiDiiDto(date, fiiNet ?? 0, diiNet ?? 0));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Failed to parse FII/DII JSON");
+            return Ok(new List<FiiDiiDto>());
+        }
+
+        var sortedList = list
+            .Select(item => new { Item = item, ParsedDate = ParseNseDate(item.Date) ?? DateTime.MinValue })
+            .OrderByDescending(x => x.ParsedDate)
+            .Select(x => x.Item)
+            .Take(5)
+            .ToList();
+
+        return Ok(sortedList);
+    }
+
+    private static decimal? GetDecimalValue(System.Text.Json.JsonElement el, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (el.TryGetProperty(key, out var prop))
+            {
+                if (prop.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    return prop.GetDecimal();
+                }
+                if (prop.ValueKind == System.Text.Json.JsonValueKind.String && decimal.TryParse(prop.GetString(), out var val))
+                {
+                    return val;
+                }
+            }
+            foreach (var p in el.EnumerateObject())
+            {
+                if (string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (p.Value.ValueKind == System.Text.Json.JsonValueKind.Number)
+                    {
+                        return p.Value.GetDecimal();
+                    }
+                    if (p.Value.ValueKind == System.Text.Json.JsonValueKind.String && decimal.TryParse(p.Value.GetString(), out var val))
+                    {
+                        return val;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static string? GetStringValue(System.Text.Json.JsonElement el, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (el.TryGetProperty(key, out var prop))
+            {
+                return prop.GetString();
+            }
+            foreach (var p in el.EnumerateObject())
+            {
+                if (string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return p.Value.GetString();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static DateTime? ParseNseDate(string dateStr)
+    {
+        if (DateTime.TryParseExact(dateStr, "dd-MMM-yyyy", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d))
+            return d;
+        if (DateTime.TryParse(dateStr, System.Globalization.CultureInfo.InvariantCulture, out var d2))
+            return d2;
+        return null;
+    }
+
     private TimeZoneInfo IstZone()
     {
         try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata"); }      // Linux/Mac

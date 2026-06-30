@@ -28,6 +28,8 @@ export interface BuySignal {
 }
 export interface Quarter { date: string; totalRevenue: number|null; netIncome: number|null; ebitda: number|null; }
 export interface Quarterly { symbol: string; revenueYoY: number|null; netIncomeYoY: number|null; quarters: Quarter[]; }
+export interface NewsItem { headline: string; source: string; publishedAt: string; url: string; sentiment: string; }
+export interface InsightCard { type: string; title: string; body: string; symbol: string | null; }
 
 // --- tiny in-memory cache (per page session) ---
 type Entry = { data: unknown; ts: number };
@@ -89,4 +91,10 @@ export async function getBuySignal(symbol: string): Promise<BuySignal | null> {
 }
 export async function getQuarterly(symbol: string): Promise<Quarterly | null> {
   return getJson<Quarterly>(`/api/stock/${symbol}/quarterly`);
+}
+export async function getNews(): Promise<NewsItem[]> {
+  return (await getJson<NewsItem[]>(`/api/news`)) ?? [];
+}
+export async function getInsights(): Promise<InsightCard[]> {
+  return (await getJson<InsightCard[]>(`/api/insights/daily`)) ?? [];
 }
