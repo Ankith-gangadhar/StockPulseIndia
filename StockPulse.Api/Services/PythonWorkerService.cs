@@ -59,4 +59,13 @@ public class PythonWorkerService
         }
         catch (Exception ex) { _log.LogError(ex, "GetScreener failed for {Type}", type); return new(); }
     }
+
+    public async Task<QuarterlyDto?> GetQuarterlyAsync(string symbol)
+    {
+        try {
+            var json = await _http.GetStringAsync($"/quarterly/{symbol}");
+            if (json.Contains("\"error\"", StringComparison.OrdinalIgnoreCase)) return null;
+            return JsonSerializer.Deserialize<QuarterlyDto>(json, JsonOpts);
+        } catch (Exception ex) { _log.LogError(ex, "GetQuarterly failed {Symbol}", symbol); return null; }
+    }
 }

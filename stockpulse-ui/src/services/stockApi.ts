@@ -21,6 +21,14 @@ export interface MarketStatus {
   isOpen: boolean; session: string; nextOpenIst: string; remainingMinutes: number;
 }
 
+export interface BuySignal {
+  symbol: string; score: number; signal: string; price: number;
+  pe: number | null; roe: number | null; rsi: number | null;
+  debtToEquity: number | null; revenueGrowth: number | null; reasons: string[];
+}
+export interface Quarter { date: string; totalRevenue: number|null; netIncome: number|null; ebitda: number|null; }
+export interface Quarterly { symbol: string; revenueYoY: number|null; netIncomeYoY: number|null; quarters: Quarter[]; }
+
 // --- tiny in-memory cache (per page session) ---
 type Entry = { data: unknown; ts: number };
 const cache = new Map<string, Entry>();
@@ -71,4 +79,14 @@ export async function getScreener(
 }
 export async function getMarketStatus(): Promise<MarketStatus | null> {
   return getJson<MarketStatus>(`/api/market/status`); // never cache — must be live
+}
+
+export async function getBuySignals(): Promise<BuySignal[]> {
+  return (await getJson<BuySignal[]>(`/api/signals/buy`)) ?? [];
+}
+export async function getBuySignal(symbol: string): Promise<BuySignal | null> {
+  return getJson<BuySignal>(`/api/signals/buy/${symbol}`);
+}
+export async function getQuarterly(symbol: string): Promise<Quarterly | null> {
+  return getJson<Quarterly>(`/api/stock/${symbol}/quarterly`);
 }

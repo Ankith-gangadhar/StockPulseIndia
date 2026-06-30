@@ -323,6 +323,91 @@ async def screen_stocks(type: str):
     _cache_set(cache_key, response_data)
     return response_data
 
+def _get_quarterly_sync(symbol: str) -> dict:
+    if symbol.startswith("^"):
+        symbol_ns = symbol
+    else:
+        symbol_ns = f"{symbol}.NS"
+        
+    ticker = yf.Ticker(symbol_ns)
+    qf = ticker.quarterly_financials
+    
+    if qf is None or qf.empty:
+        return {"symbol": symbol, "revenueYoY": None, "netIncomeYoY": None, "quarters": []}
+    
+    import numpy as np
+    
+    def clean_val(v):
+        if v is None:
+            return None
+        try:
+            val = float(v)
+            if np.isnan(val) or np.isinf(val):
+                return None
+            return val
+        except:
+            return None
+
+    # Map row indexes
+    idx_map = {str(row).lower().replace(" ", "").replace("_", ""): row for row in qf.index}
+    
+    rev_row = idx_map.get("totalrevenue") or idx_map.get("revenue") or idx_map.get("operatingrevenue")
+    net_row = idx_map.get("netincome") or idx_map.get("netincomecommonstockholders") or idx_map.get("netincomefromcontinuingoperations")
+    ebitda_row = idx_map.get("ebitda")
+
+    quarters_list = []
+    sorted_cols = sorted(qf.columns, reverse=True) # most recent first
+    
+    for col in sorted_cols[:5]:
+        date_str = str(col.date()) if hasattr(col, 'date') else str(col)[:10]
+        
+        rev_val = clean_val(qf.loc[rev_row, col]) if rev_row else None
+        net_val = clean_val(qf.loc[net_row, col]) if net_row else None
+        ebitda_val = clean_val(qf.loc[ebitda_row, col]) if ebitda_row else None
+        
+        quarters_list.append({
+            "date": date_str,
+            "totalRevenue": rev_val,
+            "netIncome": net_val,
+            "ebitda": ebitda_val
+        })
+
+    revenue_yoy = None
+    net_income_yoy = None
+    if len(quarters_list) >= 5:
+        cur_rev = quarters_list[0]["totalRevenue"]
+        past_rev = quarters_list[4]["totalRevenue"]
+        if cur_rev is not None and past_rev is not None and past_rev != 0:
+            revenue_yoy = round((cur_rev - past_rev) / past_rev * 100, 2)
+            
+        cur_net = quarters_list[0]["netIncome"]
+        past_net = quarters_list[4]["netIncome"]
+        if cur_net is not None and past_net is not None and past_net != 0:
+            net_income_yoy = round((cur_net - past_net) / past_net * 100, 2)
+
+    return {
+        "symbol": symbol,
+        "revenueYoY": revenue_yoy,
+        "netIncomeYoY": net_income_yoy,
+        "quarters": quarters_list[:4]
+    }
+
+@app.get("/quarterly/{symbol}")
+async def get_quarterly(symbol: str):
+    symbol = symbol.upper().strip()
+    key = f"quarterly:{symbol}"
+    cached = _cache_get(key, 21600)
+    if cached is not None:
+        return cached
+    try:
+        loop = asyncio.get_running_loop()
+        res = await loop.run_in_executor(None, _get_quarterly_sync, symbol)
+        if "error" not in res:
+            _cache_set(key, res)
+        return res
+    except Exception as e:
+        return JSONResponse(status_code=200, content={"error": str(e), "symbol": symbol})
+
 @app.get("/cache/clear")
 def clear_cache():
     _CACHE.clear()

@@ -48,3 +48,13 @@ public record MarketStatusDto(
     string NextOpenIst,     // ISO 8601 string
     int RemainingMinutes
 );
+
+public record BuySignalDto(
+    string Symbol, int Score, string Signal, decimal Price,
+    decimal? Pe, decimal? Roe, decimal? Rsi, decimal? DebtToEquity, decimal? RevenueGrowth,
+    List<string> Reasons
+);
+
+public record QuarterDto(string Date, decimal? TotalRevenue, decimal? NetIncome, decimal? Ebitda);
+public record QuarterlyDto(string Symbol, decimal? RevenueYoY, decimal? NetIncomeYoY, List<QuarterDto> Quarters);
+

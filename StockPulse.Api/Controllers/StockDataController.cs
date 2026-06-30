@@ -87,6 +87,27 @@ public class StockDataController : ControllerBase
         ));
     }
 
+    [HttpGet("signals/buy")]
+    [ResponseCache(Duration = 600)]
+    public async Task<IActionResult> TopBuys([FromServices] BuySignalService svc)
+        => Ok(await svc.GetTopSignalsAsync());
+
+    [HttpGet("signals/buy/{symbol}")]
+    [ResponseCache(Duration = 600)]
+    public async Task<IActionResult> BuyFor(string symbol, [FromServices] BuySignalService svc)
+    {
+        var r = await svc.CalculateForSymbolAsync(symbol.ToUpperInvariant());
+        return r is null ? NotFound() : Ok(r);
+    }
+
+    [HttpGet("stock/{symbol}/quarterly")]
+    [ResponseCache(Duration = 3600)]
+    public async Task<IActionResult> Quarterly(string symbol)
+    {
+        var d = await _worker.GetQuarterlyAsync(symbol.ToUpperInvariant());
+        return d is null ? NotFound() : Ok(d);
+    }
+
     private TimeZoneInfo IstZone()
     {
         try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata"); }      // Linux/Mac
