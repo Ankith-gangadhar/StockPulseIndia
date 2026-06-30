@@ -413,4 +413,127 @@ def clear_cache():
     _CACHE.clear()
     return {"cleared": True}
 
+# Live price push configuration & loop
+import os
+import httpx
+import datetime
+from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_URL = os.getenv("API_URL", "http://localhost:5200")
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "default_internal_secret")
+
+SYMBOLS = [
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ITC", "LT", "SBIN",
+    "BHARTIARTL", "SUNPHARMA", "TITAN", "ADANIPORTS", "WIPRO", "^NSEI"
+]
+
+def is_market_hours() -> bool:
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    now_ist = now_utc + datetime.timedelta(hours=5, minutes=30)
+    
+    if now_ist.weekday() >= 5:
+        return False
+        
+    market_start = now_ist.replace(hour=9, minute=15, second=0, microsecond=0)
+    market_end = now_ist.replace(hour=15, minute=30, second=0, microsecond=0)
+    
+    return market_start <= now_ist <= market_end
+
+def fetch_single_ticker(symbol: str):
+    sym_ns = f"{symbol}.NS" if not symbol.startswith("^") else symbol
+    ticker = yf.Ticker(sym_ns)
+    try:
+        fast = ticker.fast_info
+        price = fast.last_price
+        prev_close = fast.previous_close
+        if price is None or prev_close is None:
+            hist = ticker.history(period="2d")
+            if len(hist) >= 2:
+                price = hist["Close"].iloc[-1]
+                prev_close = hist["Close"].iloc[-2]
+            elif len(hist) == 1:
+                price = hist["Close"].iloc[-1]
+                prev_close = hist["Open"].iloc[0]
+        
+        change = price - prev_close if price and prev_close else 0.0
+        change_pct = (change / prev_close * 100) if prev_close else 0.0
+        
+        sym_clean = symbol.replace("^NSEI", "NIFTY 50")
+        name = sym_clean
+        if symbol == "^NSEI":
+            name = "NIFTY 50"
+        elif symbol == "RELIANCE":
+            name = "Reliance Industries"
+        elif symbol == "TCS":
+            name = "Tata Consultancy Services"
+        elif symbol == "INFY":
+            name = "Infosys"
+        elif symbol == "HDFCBANK":
+            name = "HDFC Bank"
+        elif symbol == "ITC":
+            name = "ITC Ltd"
+        elif symbol == "LT":
+            name = "Larsen & Toubro"
+        elif symbol == "SBIN":
+            name = "State Bank of India"
+        elif symbol == "BHARTIARTL":
+            name = "Bharti Airtel"
+        elif symbol == "SUNPHARMA":
+            name = "Sun Pharmaceutical"
+        elif symbol == "TITAN":
+            name = "Titan Company"
+        elif symbol == "ADANIPORTS":
+            name = "Adani Ports"
+        elif symbol == "WIPRO":
+            name = "Wipro Ltd"
+
+        return {
+            "Symbol": sym_clean,
+            "Name": name,
+            "Price": round(price, 2) if price else 0.0,
+            "Change": round(change, 2) if change else 0.0,
+            "ChangePercent": round(change_pct, 2) if change_pct else 0.0,
+            "Pe": None,
+            "MarketCap": None
+        }
+    except Exception as e:
+        print(f"Error for {symbol}: {e}")
+        return None
+
+def fetch_prices_parallel():
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_single_ticker, SYMBOLS))
+    return [r for r in results if r is not None]
+
+async def live_price_loop():
+    print("Starting background live price update loop...")
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        while True:
+            try:
+                if is_market_hours():
+                    print("Market is open. Fetching live prices...")
+                    loop = asyncio.get_running_loop()
+                    updates = await loop.run_in_executor(None, fetch_prices_parallel)
+                    if updates:
+                        headers = {"X-Internal-Key": INTERNAL_SECRET}
+                        url = f"{API_URL}/internal/price-update"
+                        response = await client.post(url, json=updates, headers=headers)
+                        if response.status_code == 200:
+                            print(f"Pushed {len(updates)} price updates to backend.")
+                        else:
+                            print(f"Failed to push updates. Server returned status {response.status_code}: {response.text}")
+                else:
+                    print("Market is closed. Skipping live price fetch.")
+            except Exception as e:
+                print(f"Error in live price loop: {e}")
+            
+            await asyncio.sleep(30)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(live_price_loop())
+
 

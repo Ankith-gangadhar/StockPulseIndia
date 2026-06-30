@@ -24,12 +24,12 @@ const initialState: DashboardState = {
     loading: false
 };
 
+import { getApiBaseUrl } from '../services/stockApi';
+
 export const fetchDashboardData = createAsyncThunk(
     'dashboard/fetchData',
     async () => {
-        const baseUrl = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-            ? 'http://localhost:5200'
-            : 'https://stockpulseindia.onrender.com';
+        const baseUrl = getApiBaseUrl();
         const [insightsRes, newsRes] = await Promise.all([
             fetch(`${baseUrl}/api/dashboard/insights`),
             fetch(`${baseUrl}/api/dashboard/news`)

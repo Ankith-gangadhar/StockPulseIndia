@@ -16,7 +16,11 @@ public class PythonWorkerService
     {
         _http = http;
         _log = log;
-        var baseUrl = config["PythonWorkerUrl"] ?? "http://localhost:8000";
+        var baseUrl = config["PythonWorkerUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl) || baseUrl.Contains("REPLACE_WITH"))
+        {
+            baseUrl = "http://localhost:8000";
+        }
         _http.BaseAddress = new Uri(baseUrl);
         _http.Timeout = TimeSpan.FromSeconds(60); // screeners can be slow on a cold cache
     }

@@ -1,4 +1,14 @@
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5200";
+export function getApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && !envUrl.includes("REPLACE_WITH_CSHARP_BACKEND")) {
+    return envUrl;
+  }
+  return typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5200'
+    : 'https://stockpulseindia.onrender.com';
+}
+
+const BASE = getApiBaseUrl();
 
 export interface Fundamentals {
   symbol: string; price: number | null; peRatio: number | null; forwardPe: number | null;
