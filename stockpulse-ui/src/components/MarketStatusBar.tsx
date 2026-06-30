@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getFundamentals, Fundamentals } from "../services/stockApi";
+import { getFundamentals } from "../services/stockApi";
+import type { Fundamentals } from "../services/stockApi";
 import { useMarketPolling } from "../hooks/useMarketPolling";
 
 export default function MarketStatusBar() {

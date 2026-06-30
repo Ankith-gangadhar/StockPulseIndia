@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getFiiDii, FiiDii } from "../../services/stockApi";
+import { getFiiDii } from "../../services/stockApi";
+import type { FiiDii } from "../../services/stockApi";
 import MetricTooltip from "../ui/MetricTooltip";
 import WidgetSkeleton from "../ui/WidgetSkeleton";
 import WidgetError from "../ui/WidgetError";

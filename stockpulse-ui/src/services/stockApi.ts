@@ -108,3 +108,13 @@ export async function getNews(): Promise<NewsItem[]> {
 export async function getInsights(): Promise<InsightCard[]> {
   return (await getJson<InsightCard[]>(`/api/insights/daily`)) ?? [];
 }
+
+export interface FiiDii {
+  date: string;
+  fiiNetValue: number;
+  diiNetValue: number;
+}
+
+export async function getFiiDii(): Promise<FiiDii[]> {
+  return (await getJson<FiiDii[]>(`/api/market/fiidii`)) ?? [];
+}

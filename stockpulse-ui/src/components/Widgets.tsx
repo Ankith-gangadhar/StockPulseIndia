@@ -14,7 +14,9 @@ import {
   getMarketStatus,
   getBuySignals,
   getBuySignal,
-  getQuarterly
+  getQuarterly,
+  getNews,
+  getInsights
 } from '../services/stockApi';
 import type {
   ScreenerResult,
@@ -22,7 +24,9 @@ import type {
   Technical,
   MarketStatus,
   BuySignal,
-  Quarterly
+  Quarterly,
+  NewsItem,
+  InsightCard
 } from '../services/stockApi';
 
 
@@ -215,7 +219,7 @@ export const LiveQuotesWidget = () => {
               MARKET IS CLOSED
             </div>
             <div className="text-[8px] text-gray-500">
-              Opens: {formatNextOpen(marketStatus.nextOpenUtc)}
+              Opens: {formatNextOpen(marketStatus.nextOpenIst)}
             </div>
           </div>
         )}
@@ -265,7 +269,6 @@ export const SmartWatchlistWidget = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [newSymbol, setNewSymbol] = useState("");
   const [addError, setAddError] = useState("");
-  const [marketStatus, setMarketStatus] = useState<MarketStatus | null>(null);
 
   const { pollInterval } = useMarketPolling();
 
@@ -293,9 +296,6 @@ export const SmartWatchlistWidget = () => {
     if (!isSilent) setLoading(true);
     setError(null);
     try {
-      const status = await getMarketStatus();
-      setMarketStatus(status);
-
       const promises = symbolsList.map(async sym => {
         let fund: Fundamentals | null = null;
         let buy: BuySignal | null = null;
@@ -994,7 +994,15 @@ export const NewsSentinelWidget = () => {
                   </div>
                 </div>
               </div>
-      export const FinancialSummaryWidget = () => {
+            </a>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const FinancialSummaryWidget = () => {
   const [activeSymbol, setActiveSymbol] = useState("RELIANCE");
   const [inputVal, setInputVal] = useState("RELIANCE");
   const [fund, setFund] = useState<Fundamentals | null>(null);

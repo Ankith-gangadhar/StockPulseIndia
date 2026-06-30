@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { getMarketStatus, MarketStatus } from "../services/stockApi";
+import { getMarketStatus } from "../services/stockApi";
+import type { MarketStatus } from "../services/stockApi";
 
 export function useMarketPolling() {
   const [status, setStatus] = useState<MarketStatus | null>(null);
