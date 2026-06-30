@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: stockpulse-worker
+    runtime: python
+    plan: free
+    rootDir: stockpulse-worker
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: API_URL
+        sync: false # User enters their deployed stockpulse-api Render URL
+      - key: INTERNAL_SECRET
+        sync: false # User enters a secure shared secret for SignalR pushes
+
+  - type: web
+    name: stockpulse-api
+    runtime: docker
+    plan: free
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PythonWorkerUrl
+        sync: false # User enters their deployed stockpulse-worker Render URL
+      - key: ConnectionStrings__DefaultConnection
+        sync: false # User enters their Neon PostgreSQL connection string
+      - key: InternalSecret
+        sync: false # Must match the INTERNAL_SECRET of the worker
+      - key: AllowedCorsOrigins
+        value: http://localhost:5173,https://stock-pulse-india.vercel.app

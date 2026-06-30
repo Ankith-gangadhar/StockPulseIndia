@@ -2,7 +2,7 @@
 Real-time Indian stock market screener terminal — no broker account, no PAN, free data sources.
 
 ## Architecture
-stockpulse-ui (Vercel)  →  StockPulse.Api (Railway)  →  stockpulse-worker (Railway)  →  yfinance / NSE JSON / RSS
+stockpulse-ui (Vercel)  →  StockPulse.Api (Render)  →  stockpulse-worker (Render)  →  yfinance / NSE JSON / RSS
                                      ↓
                               Neon PostgreSQL
 
@@ -27,16 +27,23 @@ stockpulse-ui (Vercel)  →  StockPulse.Api (Railway)  →  stockpulse-worker (R
    ``` (Runs Vite dev server on `http://localhost:5173`)
 
 ## Environment Configurations
-- **Worker:** 
-  - `CSHARP_BACKEND_URL`: URL of C# backend endpoint (defaults to `http://localhost:5200`).
+- **Worker (`stockpulse-worker`):** 
+  - `API_URL`: URL of the C# backend endpoint (e.g. `https://stockpulse-api.onrender.com`).
   - `INTERNAL_SECRET`: Shared authorization secret matching C# configuration for secure price pushing.
-- **Backend:** 
-  - `PythonWorkerUrl`: Base address of the FastAPI worker (defaults to `http://localhost:8000`).
+- **Backend (`StockPulse.Api`):** 
+  - `PythonWorkerUrl`: Base address of the FastAPI worker (e.g. `https://stockpulse-worker.onrender.com`).
   - `ConnectionStrings__DefaultConnection`: Database connection string for Neon Serverless Postgres.
   - `AllowedCorsOrigins`: Comma-separated list of allowed origins (defaults to localhost & vercel).
   - `InternalSecret`: Security key validating worker-to-backend price update payloads.
 - **Frontend:** 
   - `VITE_API_URL`: URL of the C# backend API (defaults to local fallback).
+
+## Render Blueprint Deployments (Free Option)
+You can deploy both the C# backend and Python worker services to Render for free using the Blueprint spec file [render.yaml](file:///d:/Bloomberg%20Terminal%20Stock/StockPulseIndia/render.yaml):
+1. Create a free account at **[Render.com](https://render.com)**.
+2. Link your GitHub repository.
+3. Select **Blueprints** from the Render dashboard.
+4. Render will automatically parse the `render.yaml` file, provision the services, and prompt you to input the environment variable secrets.
 
 ## Data Sources (Free, No Registration)
 - **Yahoo Finance (`yfinance`):** Real-time stock prices, indices, fundamentals, technical metrics, and quarterly reports.
