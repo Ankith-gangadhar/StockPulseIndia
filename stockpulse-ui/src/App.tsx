@@ -76,20 +76,7 @@ function App() {
   const [layout, setLayout] = useState(defaultLayout);
   const { width, containerRef, mounted } = useContainerWidth();
 
-  const [screenerData, setScreenerData] = useState<any[]>([]);
-  
-  useEffect(() => {
-    const fetchScreener = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/screener/metrics`);
-        if (res.ok) {
-          const data = await res.json();
-          setScreenerData(data);
-        }
-      } catch (e) { }
-    };
-    fetchScreener();
-  }, []);
+
 
   useEffect(() => {
     dispatch(fetchDashboardData());
@@ -252,11 +239,11 @@ function App() {
             margin={[8, 8]}
           >
             <div key="quotes" className="h-full"><LiveQuotesWidget /></div>
-            <div key="screener-PE" className="h-full"><ScreenerMetricWidget tabName="PE" screenerData={screenerData} /></div>
-            <div key="screener-ROE" className="h-full"><ScreenerMetricWidget tabName="ROE" screenerData={screenerData} /></div>
-            <div key="screener-DEBT" className="h-full"><ScreenerMetricWidget tabName="DEBT" screenerData={screenerData} /></div>
-            <div key="screener-GROWTH" className="h-full"><ScreenerMetricWidget tabName="GROWTH" screenerData={screenerData} /></div>
-            <div key="screener-TECH" className="h-full"><ScreenerMetricWidget tabName="TECH" screenerData={screenerData} /></div>
+            <div key="screener-PE" className="h-full"><ScreenerMetricWidget tabName="PE" /></div>
+            <div key="screener-ROE" className="h-full"><ScreenerMetricWidget tabName="ROE" /></div>
+            <div key="screener-DEBT" className="h-full"><ScreenerMetricWidget tabName="DEBT" /></div>
+            <div key="screener-GROWTH" className="h-full"><ScreenerMetricWidget tabName="GROWTH" /></div>
+            <div key="screener-TECH" className="h-full"><ScreenerMetricWidget tabName="TECH" /></div>
 
             <div key="chart" className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
               <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">

@@ -1,5 +1,8 @@
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
+import { useState, useEffect, useCallback } from 'react';
+import { getScreener, clearApiCache } from '../services/stockApi';
+import type { ScreenerResult } from '../services/stockApi';
 
 
 const FINANCIALS_DATA = [
@@ -278,57 +281,224 @@ export const RiskMeterWidget = () => (
   </div>
 );
 
-export const ScreenerMetricWidget = ({ tabName, screenerData }: { tabName: string, screenerData: any[] }) => {
-  let filtered: any[] = [];
-  let description = '';
-  if (tabName === 'PE') {
-    filtered = screenerData.filter(s => s.isPeHealthy).slice(0, 5);
-    description = "Healthy P/E Ratio (10-25x)";
-  } else if (tabName === 'ROE') {
-    filtered = screenerData.filter(s => s.isRoeGood).slice(0, 5);
-    description = "Strong ROE (>15%)";
-  } else if (tabName === 'DEBT') {
-    filtered = screenerData.filter(s => s.isDebtLow).slice(0, 5);
-    description = "Low Debt to Equity (<0.5)";
-  } else if (tabName === 'GROWTH') {
-    filtered = screenerData.filter(s => s.isGrowthStrong).slice(0, 5);
-    description = "High Revenue & Profit Growth";
-  } else if (tabName === 'TECH') {
-    filtered = screenerData.filter(s => s.isTechnicalBuy).slice(0, 5);
-    description = "RSI < 30 OR MACD Positive";
-  }
+export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
+  const type = tabName.toLowerCase() as "pe" | "roe" | "debt" | "growth" | "tech";
+  const [results, setResults] = useState<ScreenerResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [minutesAgo, setMinutesAgo] = useState(0);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const data = await getScreener(type);
+      setResults(data);
+      setLastUpdated(new Date());
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [type]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useEffect(() => {
+    if (!lastUpdated) return;
+    const interval = setInterval(() => {
+      setMinutesAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 60000));
+    }, 30000);
+    setMinutesAgo(Math.floor((Date.now() - lastUpdated.getTime()) / 60000));
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
+
+  const handleRefresh = () => {
+    clearApiCache();
+    fetchData();
+  };
+
+  const getBadgeDetails = (val: number) => {
+    let badgeColor = "";
+    let tooltipText = "";
+    let formattedValue = "";
+
+    switch (type) {
+      case "pe":
+        formattedValue = `${val.toFixed(1)}x`;
+        if (val < 20) {
+          badgeColor = "text-neonGreen bg-neonGreen/10 border-neonGreen/20";
+        } else if (val >= 20 && val <= 35) {
+          badgeColor = "text-neonAmber bg-neonAmber/10 border-neonAmber/20";
+        } else {
+          badgeColor = "text-neonRed bg-neonRed/10 border-neonRed/20";
+        }
+        tooltipText = `P/E Ratio: You pay ₹${val.toFixed(1)} for every ₹1 earned. Below 20 is fair. IT stocks can be 30. PSU banks are normal at PE 10.`;
+        break;
+
+      case "roe":
+        formattedValue = `${val.toFixed(1)}%`;
+        if (val > 20) {
+          badgeColor = "text-neonGreen bg-neonGreen/10 border-neonGreen/20";
+        } else if (val >= 15 && val <= 20) {
+          badgeColor = "text-neonAmber bg-neonAmber/10 border-neonAmber/20";
+        } else {
+          badgeColor = "text-neonRed bg-neonRed/10 border-neonRed/20";
+        }
+        tooltipText = `Return on Equity: Company earns ${val.toFixed(1)}% per year on its own money. Above 15% is good, above 20% is excellent.`;
+        break;
+
+      case "debt":
+        formattedValue = val.toFixed(2);
+        if (val < 0.3) {
+          badgeColor = "text-neonGreen bg-neonGreen/10 border-neonGreen/20";
+        } else if (val >= 0.3 && val <= 1.0) {
+          badgeColor = "text-neonAmber bg-neonAmber/10 border-neonAmber/20";
+        } else {
+          badgeColor = "text-neonRed bg-neonRed/10 border-neonRed/20";
+        }
+        tooltipText = `Debt to Equity: For every ₹1 of own money this company has ₹${val.toFixed(2)} of debt. Below 0.5 is healthy. Banks are excluded here.`;
+        break;
+
+      case "tech":
+        formattedValue = `RSI ${val.toFixed(1)}`;
+        if (val < 35) {
+          badgeColor = "text-neonGreen bg-neonGreen/10 border-neonGreen/20";
+        } else if (val >= 35 && val <= 50) {
+          badgeColor = "text-neonAmber bg-neonAmber/10 border-neonAmber/20";
+        } else if (val > 70) {
+          badgeColor = "text-neonRed bg-neonRed/10 border-neonRed/20";
+        } else {
+          badgeColor = "text-gray-400 bg-gray-900 border-gray-800";
+        }
+        tooltipText = `RSI ${val.toFixed(1)}: Below 30 = oversold (possible buy). Above 70 = overbought (avoid buying now).`;
+        break;
+
+      case "growth":
+        formattedValue = `${val.toFixed(1)}%`;
+        if (val > 20) {
+          badgeColor = "text-neonGreen bg-neonGreen/10 border-neonGreen/20";
+        } else if (val >= 10 && val <= 20) {
+          badgeColor = "text-neonAmber bg-neonAmber/10 border-neonAmber/20";
+        } else {
+          badgeColor = "text-neonRed bg-neonRed/10 border-neonRed/20";
+        }
+        tooltipText = `Profit grew ${val.toFixed(1)}% YoY. Above 15% is strong. Profit growing faster than revenue = improving margins.`;
+        break;
+
+      default:
+        formattedValue = val.toString();
+        badgeColor = "text-gray-400 bg-gray-950 border-gray-850";
+        tooltipText = `Value: ${val}`;
+    }
+
+    return { badgeColor, tooltipText, formattedValue };
+  };
+
+  const getScreenerDescription = () => {
+    switch (type) {
+      case "pe": return "Healthy P/E Ratio (<20x)";
+      case "roe": return "Strong ROE (>15%)";
+      case "debt": return "Low Debt to Equity (<0.5)";
+      case "growth": return "High Revenue & Profit Growth";
+      case "tech": return "RSI < 30 OR MACD Positive";
+      default: return "";
+    }
+  };
 
   return (
     <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+      {/* Title Header */}
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
         <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
         <span className="text-xs px-1 py-0.5 rounded bg-neonAmber/10 text-neonAmber border border-neonAmber/20">DATA</span>
       </div>
+
+      {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-1 space-y-2">
-        {screenerData.length === 0 ? (
-          <p className="text-xs text-gray-600 mt-4 text-center">Loading {tabName} metrics...</p>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[100px] mt-4 animate-pulse">
+            <span className="text-xs text-neonGreen font-bold tracking-widest uppercase">SCANNING NIFTY 50...</span>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center p-4 text-center mt-4">
+            <span className="text-xs text-neonRed font-bold mb-2">⚠ SCAN FAILED — CHECK CONNECTION</span>
+            <button
+              onClick={handleRefresh}
+              className="text-[10px] uppercase font-bold tracking-wider px-2 py-1 bg-neonRed/10 text-neonRed border border-neonRed/30 hover:bg-neonRed/20 transition-all rounded"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <>
-            <div className="text-xs text-center text-gray-500 mb-2 italic px-1 truncate" title={description}>{description}</div>
-            {filtered.length === 0 ? <p className="text-xs text-center text-gray-500 mt-2">No stocks match.</p> : null}
-            {filtered.map(item => (
-              <div key={item.symbol} className="flex justify-between items-center p-1.5 border border-gray-800/40 bg-white/5 hover:bg-white/10 rounded transition-colors group">
-                <div className="overflow-hidden">
-                  <div className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors truncate">{item.symbol}</div>
-                  <div className="text-xs text-gray-500 truncate" title={item.companyName}>{item.companyName}</div>
-                </div>
-                <div className="text-right shrink-0 ml-2">
-                  <div className="text-sm font-mono text-neonGreen">Rs {item.price ? item.price.toFixed(2) : '0.00'}</div>
-                  {tabName === 'PE' && <div className="text-xs text-gray-400">PE: {item.pe ? item.pe.toFixed(1) : 'N/A'}</div>}
-                  {tabName === 'ROE' && <div className="text-xs text-gray-400">ROE: {item.roe ? item.roe.toFixed(1) : 'N/A'}%</div>}
-                  {tabName === 'DEBT' && <div className="text-xs text-gray-400">D/E: {item.debtToEquity ? item.debtToEquity.toFixed(2) : 'N/A'}</div>}
-                  {tabName === 'GROWTH' && <div className="text-xs text-gray-400">Growth: {item.revenueGrowth ? item.revenueGrowth.toFixed(1) : 'N/A'}%</div>}
-                  {tabName === 'TECH' && <div className="text-xs text-gray-400">RSI: {item.rsi ? item.rsi.toFixed(1) : 'N/A'}</div>}
-                </div>
-              </div>
-            ))}
+            <div className="text-xs text-center text-gray-500 mb-2 italic px-1 truncate" title={getScreenerDescription()}>
+              {getScreenerDescription()}
+            </div>
+            {results.length === 0 ? (
+              <p className="text-xs text-center text-gray-500 mt-4 px-2">
+                NO MATCHES RIGHT NOW — market conditions don't fit this screen.
+              </p>
+            ) : (
+              results.map((item) => {
+                const { badgeColor, tooltipText, formattedValue } = getBadgeDetails(item.metricValue);
+                return (
+                  <div
+                    key={item.symbol}
+                    className="flex justify-between items-center p-1.5 border border-gray-800/40 bg-white/5 hover:bg-white/10 rounded transition-colors group"
+                  >
+                    <div className="overflow-hidden pr-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors truncate">
+                          {item.symbol}
+                        </span>
+                        {item.sector && (
+                          <span className="text-[9px] uppercase px-1 py-0.2 bg-gray-800 text-gray-400 rounded-sm shrink-0 truncate max-w-[80px]">
+                            {item.sector}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate" title={item.symbol}>
+                        {item.symbol} Industries
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end">
+                      <div className="text-sm font-mono text-neonGreen">
+                        ₹{item.price ? item.price.toFixed(2) : "0.00"}
+                      </div>
+                      
+                      {/* CSS Hover Tooltip on Badge */}
+                      <div className="relative group/tooltip inline-block mt-0.5">
+                        <span className={`text-[10px] px-1 py-0.5 rounded border font-mono select-none cursor-help font-bold ${badgeColor}`}>
+                          {formattedValue}
+                        </span>
+                        <div className="absolute right-0 bottom-full mb-2 hidden group-hover/tooltip:block z-50 bg-gray-950 text-gray-200 text-[10px] rounded border border-gray-800 p-2 w-48 shadow-2xl pointer-events-none text-left leading-normal font-sans">
+                          {tooltipText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </>
         )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-auto border-t border-gray-800 bg-gray-900/40 px-2 py-1.5 flex justify-between items-center text-[10px] text-gray-500 font-mono">
+        <span>Last scanned: {lastUpdated ? `${minutesAgo}m ago` : "never"}</span>
+        <button
+          onClick={handleRefresh}
+          className="text-neonAmber hover:text-neonGreen transition-colors flex items-center gap-1 focus:outline-none"
+          title="Refresh Data"
+        >
+          <span>↺</span>
+          <span className="uppercase tracking-wider">Refresh</span>
+        </button>
       </div>
     </div>
   );
