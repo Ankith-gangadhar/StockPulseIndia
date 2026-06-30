@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StockPulse.Api.Data;
+using StockPulse.Api.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
 using StackExchange.Redis;
@@ -13,6 +14,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient();
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<PythonWorkerService>();
+builder.Services.AddResponseCaching();
 
 // Configure PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -74,6 +77,7 @@ app.MapScalarApiReference();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
+app.UseResponseCaching();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<StockPulse.Api.Hubs.StockHub>("/stockHub");
