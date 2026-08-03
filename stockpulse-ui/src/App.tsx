@@ -8,6 +8,8 @@ import { Analytics } from '@vercel/analytics/react';
 import { Responsive as ResponsiveGridLayout, useContainerWidth } from "react-grid-layout";
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
+import GlobalSearch from './components/GlobalSearch';
+import StockPanel from './components/StockPanel/StockPanel';
 import {
   LiveQuotesWidget,
   SmartWatchlistWidget,
@@ -77,10 +79,52 @@ function App() {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null);
   const [chartTabs, setChartTabs] = useState<ChartTab[]>([]);
+  const [panelSymbol, setPanelSymbol] = useState<string | null>(null);
   
   const [layout, setLayout] = useState(defaultLayout);
   const { width, containerRef, mounted } = useContainerWidth();
   const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const symbol = (e as CustomEvent).detail as string;
+      if (symbol) setPanelSymbol(symbol);
+    };
+    window.addEventListener('openStockPanel', handler);
+    return () => window.removeEventListener('openStockPanel', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const symbol = (e as CustomEvent).detail as string;
+      if (symbol) {
+        setChartQuery(symbol);
+        setTimeout(async () => {
+          try {
+            const res = await fetch(`${API_BASE}/api/market/chart-config?symbol=${encodeURIComponent(symbol)}&timeframe=1d`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setChartTabs(prev => {
+              if (prev.some(t => t.symbol === data.symbol)) return prev;
+              return [...prev, {
+                id: makeChartId(),
+                symbol: data.symbol,
+                title: data.name,
+                tradingViewSymbol: data.tradingViewSymbol,
+                timeframe: '1d',
+                embedUrl: data.embedUrl,
+                fullChartUrl: data.fullChartUrl,
+              }];
+            });
+          } catch (err) {
+            console.error('Failed to auto-add chart tab:', err);
+          }
+        }, 100);
+      }
+    };
+    window.addEventListener('openChart', handler);
+    return () => window.removeEventListener('openChart', handler);
+  }, []);
 
   useEffect(() => {
     getMarketStatus().then(s => { if (s) setMarketOpen(s.isOpen); });
@@ -227,6 +271,7 @@ function App() {
             STOCK<span className="text-neonAmber">PULSE</span> <span className="text-gray-500">ANKITH</span>
           </h1>
         </div>
+        <GlobalSearch onSelectStock={(symbol) => setPanelSymbol(symbol)} />
         <div className="flex items-center gap-4 text-xs text-gray-500">
           <span>NSE / BSE</span>
           <span className="text-gray-700">|</span>
@@ -237,6 +282,7 @@ function App() {
           <span>{new Date().toLocaleTimeString('en-IN', { hour12: false })} IST</span>
         </div>
       </header>
+      <StockPanel symbol={panelSymbol} onClose={() => setPanelSymbol(null)} />
       <MarketStatusBar />
 
       {mounted && (() => {

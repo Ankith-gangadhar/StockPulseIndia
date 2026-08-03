@@ -5,6 +5,7 @@ import MetricTooltip from './ui/MetricTooltip';
 import WidgetSkeleton from './ui/WidgetSkeleton';
 import WidgetError from './ui/WidgetError';
 import StaleDataBadge from './ui/StaleDataBadge';
+import { openStockPanel } from '../utils/openPanel';
 import { useMarketPolling } from '../hooks/useMarketPolling';
 import {
   getScreener,
@@ -194,7 +195,12 @@ export const LiveQuotesWidget = () => {
         {nifty && (
           <div className="p-2 bg-gray-900/80 border border-gray-850 rounded flex justify-between items-center font-mono">
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-gray-400">NIFTY 50</div>
+              <button
+                onClick={() => openStockPanel(nifty.symbol)}
+                className="text-[10px] uppercase tracking-wider text-gray-400 hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none"
+              >
+                NIFTY 50
+              </button>
               <div className={`text-sm font-bold text-white px-1 rounded ${flashClasses[nifty.symbol] || ""}`}>{nifty.price ? nifty.price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</div>
             </div>
             {nifty.changePercent !== null ? (
@@ -230,7 +236,12 @@ export const LiveQuotesWidget = () => {
                 className="flex justify-between items-center py-1.5 px-2 border-b border-gray-850 hover:bg-white/5 rounded transition-colors group"
               >
                 <div>
-                  <div className="text-xs font-bold text-white group-hover:text-neonAmber transition-colors font-mono">{stock.symbol}</div>
+                  <button
+                    onClick={() => openStockPanel(stock.symbol)}
+                    className="text-xs font-bold text-white hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none font-mono"
+                  >
+                    {stock.symbol}
+                  </button>
                   <div className="text-[9px] text-gray-500 truncate max-w-[120px] font-mono">{stock.sector || "NIFTY Stock"}</div>
                 </div>
                 <div className="text-right font-mono">
@@ -461,7 +472,12 @@ export const SmartWatchlistWidget = () => {
               <div key={item.symbol} className="border border-gray-850 bg-black/10 rounded p-1.5 flex flex-col gap-1.5 hover:border-gray-700 transition-colors group">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white">{item.symbol}</span>
+                    <button
+                      onClick={() => openStockPanel(item.symbol)}
+                      className="text-xs font-bold text-white hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none"
+                    >
+                      {item.symbol}
+                    </button>
                     <button
                       onClick={() => handleRemove(item.symbol)}
                       className="text-gray-600 hover:text-neonRed opacity-0 group-hover:opacity-100 transition-opacity focus:outline-none font-bold text-[10px] cursor-pointer"
@@ -663,7 +679,12 @@ export const BuyTodayWidget = () => {
                 <div key={s.symbol} className="border border-gray-850 bg-black/10 rounded p-2 space-y-2">
                   <div className="flex justify-between items-baseline">
                     <div>
-                      <span className="text-sm font-bold text-white">{s.symbol}</span>
+                      <button
+                        onClick={() => openStockPanel(s.symbol)}
+                        className="text-sm font-bold text-white hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none"
+                      >
+                        {s.symbol}
+                      </button>
                       <span className="text-[9px] text-gray-500 ml-1.5">₹{s.price.toFixed(1)}</span>
                     </div>
                     <span className={`px-1.5 py-0.5 rounded border text-[8px] font-bold uppercase tracking-wider ${badgeColor}`}>
@@ -778,7 +799,12 @@ export const FallenStocksWidget = () => {
         ) : FALLEN_STOCKS.map((item) => (
           <div key={item.symbol} className="p-1 border border-neonRed/30 rounded bg-neonRed/5">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-white">{item.symbol}</span>
+              <button
+                onClick={() => openStockPanel(item.symbol)}
+                className="text-xs font-bold text-white hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none"
+              >
+                {item.symbol}
+              </button>
               <span className="text-xs text-neonRed">{item.down}</span>
             </div>
             <div className="text-xs text-gray-300 mt-1">{item.note}</div>
@@ -1713,9 +1739,12 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
               >
                 <div className="overflow-hidden pr-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-white group-hover:text-neonAmber transition-colors truncate">
+                    <button
+                      onClick={() => openStockPanel(item.symbol)}
+                      className="text-sm font-bold text-white hover:text-neonGreen cursor-pointer transition-colors text-left focus:outline-none truncate"
+                    >
                       {item.symbol}
-                    </span>
+                    </button>
                     {item.sector && (
                       <span className="text-[9px] uppercase px-1 py-0.2 bg-gray-800 text-gray-400 rounded-sm shrink-0 truncate max-w-[80px]">
                         {item.sector}
