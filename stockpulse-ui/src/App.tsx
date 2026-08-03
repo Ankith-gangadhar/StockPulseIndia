@@ -99,7 +99,9 @@ function App() {
           const data = await res.json();
           dispatch(setStocks(data));
         }
-      } catch (e) { }
+      } catch (e) {
+        console.error('Failed to fetch live quotes:', e);
+      }
     };
     fetchLiveQuotes();
 
@@ -238,6 +240,7 @@ function App() {
       <MarketStatusBar />
 
       {mounted && (() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const Grid = ResponsiveGridLayout as any;
         return (
           <div className="grid-bg relative">
@@ -248,6 +251,7 @@ function App() {
             breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
             cols={{ lg: 5, md: 4, sm: 3, xs: 2, xxs: 1 }}
             rowHeight={100}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onLayoutChange={(newLayout: any) => setLayout(newLayout)}
             draggableHandle=".drag-handle"
             margin={[8, 8]}

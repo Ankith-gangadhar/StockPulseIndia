@@ -11,7 +11,7 @@ export default function WidgetSkeleton({ rows = 5, title = '' }: { rows?: number
             <div
               className="h-3 bg-gray-800 rounded animate-pulse"
               style={{
-                width: `${60 + Math.random() * 30}%`,
+                width: `${60 + ((i * 37) % 30)}%`,
                 animationDelay: `${i * 0.1}s`,
                 background: 'linear-gradient(90deg, #1a1c1e 25%, rgba(57,255,20,0.06) 50%, #1a1c1e 75%)',
                 backgroundSize: '200% 100%',
