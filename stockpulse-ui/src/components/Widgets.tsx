@@ -254,9 +254,20 @@ export const LiveQuotesWidget = () => {
   );
 };
 
+interface WatchlistItem {
+  symbol: string;
+  price: number | null;
+  changePercent: number | null;
+  peRatio: number | null;
+  roe: number | null;
+  rsi: number | null;
+  signal: string | null;
+  score: number | null;
+}
+
 export const SmartWatchlistWidget = () => {
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -723,14 +734,24 @@ export const BuyTodayWidget = () => {
 
 export const FallenStocksWidget = () => {
   const { stocks } = useSelector((state: RootState) => state.stock);
-  const liveStocks = stocks as any[];
+  const liveStocks = stocks;
   const [justLoaded, setJustLoaded] = useState(false);
+  const hasStocks = stocks.length > 0;
+
   useEffect(() => {
-    if (stocks.length > 0) {
-      setJustLoaded(true);
-      setTimeout(() => setJustLoaded(false), 700);
+    if (hasStocks) {
+      const timer1 = setTimeout(() => {
+        setJustLoaded(true);
+      }, 0);
+      const timer2 = setTimeout(() => {
+        setJustLoaded(false);
+      }, 700);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }, [stocks.length > 0]);
+  }, [hasStocks]);
   const FALLEN_STOCKS = liveStocks.length ? liveStocks
     .filter(s => s.changePercent < 0)
     .sort((a, b) => a.changePercent - b.changePercent)
@@ -1027,7 +1048,7 @@ export const FinancialSummaryWidget = () => {
     }
   }, [loading]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -1047,11 +1068,11 @@ export const FinancialSummaryWidget = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeSymbol]);
 
   useEffect(() => {
     fetchData();
-  }, [activeSymbol]);
+  }, [fetchData]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1326,7 +1347,7 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
     setInputVal(defaultSymbol);
   }, [defaultSymbol]);
 
-  const fetchRiskData = async () => {
+  const fetchRiskData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -1346,11 +1367,11 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeSymbol]);
 
   useEffect(() => {
     fetchRiskData();
-  }, [activeSymbol]);
+  }, [fetchRiskData]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
