@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -416,7 +416,6 @@ def clear_cache():
 # Live price push configuration & loop
 import os
 import httpx
-import datetime
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
@@ -431,8 +430,8 @@ SYMBOLS = [
 ]
 
 def is_market_hours() -> bool:
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
-    now_ist = now_utc + datetime.timedelta(hours=5, minutes=30)
+    now_utc = datetime.now(timezone.utc)
+    now_ist = now_utc + timedelta(hours=5, minutes=30)
     
     if now_ist.weekday() >= 5:
         return False
