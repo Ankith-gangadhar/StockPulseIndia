@@ -8,15 +8,6 @@
   }
 }
 
-@layer utilities {
-  .glow-green {
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
-  }
-
-  .glow-red {
-    box-shadow: 0 0 10px rgba(255, 0, 60, 0.2);
-  }
-}
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
@@ -113,4 +104,174 @@
 }
 .ws-cursor {
   animation: ws-blink 1.0s steps(1) infinite;
+}
+
+/* --- Prompt 01 Scanlines & Glow --- */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.35) 100%
+  );
+}
+
+.neon-text {
+  text-shadow: 0 0 8px currentColor, 0 0 20px currentColor;
+}
+
+.glow-green {
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.25), inset 0 0 8px rgba(57, 255, 20, 0.04);
+}
+.glow-amber {
+  box-shadow: 0 0 8px rgba(255, 179, 0, 0.25), inset 0 0 8px rgba(255, 179, 0, 0.04);
+}
+.glow-red {
+  box-shadow: 0 0 8px rgba(255, 49, 49, 0.25), inset 0 0 8px rgba(255, 49, 49, 0.04);
+}
+
+@keyframes scanSweep {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+.scan-sweep::after {
+  content: '';
+  position: fixed;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(57,255,20,0.15), transparent);
+  animation: scanSweep 8s linear infinite;
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* --- Prompt 02 Grid Background --- */
+.grid-bg {
+  position: relative;
+}
+
+.grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(57, 255, 20, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 255, 20, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridPulse 4s ease-in-out infinite;
+}
+
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+.grid-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(57,255,20,0.15) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* --- Prompt 03 Widget Glassmorphism --- */
+.widget-card {
+  background: rgba(18, 24, 32, 0.85) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(57, 255, 20, 0.12) !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.widget-card:hover {
+  border-color: rgba(57, 255, 20, 0.3) !important;
+  box-shadow: 0 0 16px rgba(57, 255, 20, 0.1), 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.drag-handle:hover {
+  background: rgba(57, 255, 20, 0.05) !important;
+}
+
+.widget-title {
+  color: rgba(57, 255, 20, 0.8);
+  text-shadow: 0 0 12px rgba(57, 255, 20, 0.4);
+  letter-spacing: 0.1em;
+}
+
+@keyframes freshPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(57,255,20,0.4); }
+  70%  { box-shadow: 0 0 0 6px rgba(57,255,20,0); }
+  100% { box-shadow: 0 0 0 0 rgba(57,255,20,0); }
+}
+.data-fresh {
+  animation: freshPulse 2s ease-out;
+}
+
+/* --- Prompt 05 Flash Animations --- */
+@keyframes flashGreen {
+  0%   { background-color: rgba(57, 255, 20, 0.4); }
+  100% { background-color: transparent; }
+}
+@keyframes flashRed {
+  0%   { background-color: rgba(255, 49, 49, 0.4); }
+  100% { background-color: transparent; }
+}
+.flash-green { animation: flashGreen 0.8s ease-out; }
+.flash-red   { animation: flashRed 0.8s ease-out; }
+
+/* --- Prompt 06 Market Overlay --- */
+@keyframes fadeInOut {
+  0%   { opacity: 0; transform: scale(0.9); }
+  15%  { opacity: 1; transform: scale(1); }
+  75%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+
+.market-closed-dim {
+  filter: brightness(0.85) saturate(0.7);
+  transition: filter 1s ease;
+}
+.market-open-bright {
+  filter: brightness(1) saturate(1);
+  transition: filter 1s ease;
+}
+
+/* --- Prompt 07 Neon Skeleton Shimmer --- */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes loadedRing {
+  0%   { box-shadow: 0 0 0 0 rgba(57,255,20,0.5); }
+  100% { box-shadow: 0 0 0 12px rgba(57,255,20,0); }
+}
+.widget-loaded {
+  animation: loadedRing 0.6s ease-out;
 }

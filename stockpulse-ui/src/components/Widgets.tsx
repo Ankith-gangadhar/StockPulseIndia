@@ -40,6 +40,14 @@ export const LiveQuotesWidget = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [justLoaded, setJustLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setJustLoaded(true);
+      setTimeout(() => setJustLoaded(false), 700);
+    }
+  }, [loading]);
 
   const { pollInterval } = useMarketPolling();
 
@@ -141,9 +149,9 @@ export const LiveQuotesWidget = () => {
 
   if (loading) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Live Quotes</span>
         </div>
         <WidgetSkeleton rows={6} />
       </div>
@@ -152,9 +160,9 @@ export const LiveQuotesWidget = () => {
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Live Quotes</span>
         </div>
         <WidgetError message={error} onRetry={() => fetchAll(false)} />
       </div>
@@ -162,27 +170,12 @@ export const LiveQuotesWidget = () => {
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 hover:border-gray-600 transition-colors flex flex-col overflow-hidden">
+    <div className={`h-full bg-surface border border-gray-800 widget-card hover:border-gray-600 transition-colors flex flex-col overflow-hidden ${justLoaded ? 'widget-loaded' : ''}`}>
       {/* Self-contained CSS keyframe animations */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes flash {
-          0% { background-color: var(--flash-color); }
-          100% { background-color: transparent; }
-        }
-        .flash-green {
-          --flash-color: rgba(0, 255, 65, 0.4);
-          animation: flash 0.8s ease-out;
-        }
-        .flash-red {
-          --flash-color: rgba(255, 0, 60, 0.4);
-          animation: flash 0.8s ease-out;
-        }
-      `}} />
-
       {/* Header */}
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Live Quotes</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Live Quotes</span>
           {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
         {marketStatus?.isOpen ? (
@@ -199,13 +192,13 @@ export const LiveQuotesWidget = () => {
       <div className="flex-1 overflow-y-auto p-1 space-y-2">
         {/* NIFTY Index Header Row */}
         {nifty && (
-          <div className={`p-2 bg-gray-900/80 border border-gray-850 rounded flex justify-between items-center font-mono ${flashClasses[nifty.symbol] || ""}`}>
+          <div className="p-2 bg-gray-900/80 border border-gray-850 rounded flex justify-between items-center font-mono">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-gray-400">NIFTY 50</div>
-              <div className="text-sm font-bold text-white">{nifty.price ? nifty.price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</div>
+              <div className={`text-sm font-bold text-white px-1 rounded ${flashClasses[nifty.symbol] || ""}`}>{nifty.price ? nifty.price.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "—"}</div>
             </div>
             {nifty.changePercent !== null ? (
-              <div className={`text-xs text-right font-bold ${(nifty.changePercent ?? 0) >= 0 ? "text-neonGreen" : "text-neonRed"}`}>
+              <div className={`text-xs text-right font-bold px-1 rounded ${(nifty.changePercent ?? 0) >= 0 ? "text-neonGreen" : "text-neonRed"} ${flashClasses[nifty.symbol] || ""}`}>
                 {(nifty.changePercent ?? 0) >= 0 ? "▲" : "▼"} {Math.abs(nifty.change ?? 0).toFixed(2)} ({nifty.changePercent.toFixed(2)}%)
               </div>
             ) : null}
@@ -234,18 +227,18 @@ export const LiveQuotesWidget = () => {
             return (
               <div
                 key={stock.symbol}
-                className={`flex justify-between items-center py-1.5 px-2 border-b border-gray-850 hover:bg-white/5 rounded transition-colors group ${flashClass}`}
+                className="flex justify-between items-center py-1.5 px-2 border-b border-gray-850 hover:bg-white/5 rounded transition-colors group"
               >
                 <div>
                   <div className="text-xs font-bold text-white group-hover:text-neonAmber transition-colors font-mono">{stock.symbol}</div>
                   <div className="text-[9px] text-gray-500 truncate max-w-[120px] font-mono">{stock.sector || "NIFTY Stock"}</div>
                 </div>
                 <div className="text-right font-mono">
-                  <div className="text-xs text-white">
+                  <div className={`text-xs text-white px-1 rounded ${flashClass}`}>
                     {stock.price !== null ? `₹${stock.price.toFixed(2)}` : "—"}
                   </div>
                   {stock.changePercent !== null && stock.change !== null ? (
-                    <div className={`text-[9px] font-bold ${isUp ? "text-neonGreen" : "text-neonRed"}`}>
+                    <div className={`text-[9px] font-bold px-1 rounded ${isUp ? "text-neonGreen" : "text-neonRed"} ${flashClass}`}>
                       {isUp ? "▲" : "▼"} ₹{Math.abs(stock.change).toFixed(2)} ({stock.changePercent.toFixed(2)}%)
                     </div>
                   ) : (
@@ -402,9 +395,9 @@ export const SmartWatchlistWidget = () => {
 
   if (loading && items.length === 0) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Watchlist</span>
         </div>
         <WidgetSkeleton rows={4} />
       </div>
@@ -413,9 +406,9 @@ export const SmartWatchlistWidget = () => {
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Watchlist</span>
         </div>
         <WidgetError message={error} onRetry={() => fetchDetails(watchlist, false)} />
       </div>
@@ -423,10 +416,10 @@ export const SmartWatchlistWidget = () => {
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden">
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Watchlist</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Watchlist</span>
           {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
         <form onSubmit={handleAdd} className="flex items-center gap-1">
@@ -547,6 +540,14 @@ export const BuyTodayWidget = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [justLoaded, setJustLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setJustLoaded(true);
+      setTimeout(() => setJustLoaded(false), 700);
+    }
+  }, [loading]);
   const [minutesAgo, setMinutesAgo] = useState(0);
 
   const { pollInterval } = useMarketPolling();
@@ -594,9 +595,9 @@ export const BuyTodayWidget = () => {
 
   if (loading && signals.length === 0) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Top Conviction Buys</span>
         </div>
         <WidgetSkeleton rows={4} />
       </div>
@@ -605,9 +606,9 @@ export const BuyTodayWidget = () => {
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Top Conviction Buys</span>
         </div>
         <WidgetError message={error} onRetry={fetchSignals} />
       </div>
@@ -615,10 +616,10 @@ export const BuyTodayWidget = () => {
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
+    <div className={`h-full bg-surface border border-gray-800 widget-card flex flex-col hover:border-gray-600 transition-colors overflow-hidden ${justLoaded ? 'widget-loaded' : ''}`}>
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Top Conviction Buys</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Top Conviction Buys</span>
           {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
       </div>
@@ -723,6 +724,13 @@ export const BuyTodayWidget = () => {
 export const FallenStocksWidget = () => {
   const { stocks } = useSelector((state: RootState) => state.stock);
   const liveStocks = stocks as any[];
+  const [justLoaded, setJustLoaded] = useState(false);
+  useEffect(() => {
+    if (stocks.length > 0) {
+      setJustLoaded(true);
+      setTimeout(() => setJustLoaded(false), 700);
+    }
+  }, [stocks.length > 0]);
   const FALLEN_STOCKS = liveStocks.length ? liveStocks
     .filter(s => s.changePercent < 0)
     .sort((a, b) => a.changePercent - b.changePercent)
@@ -734,10 +742,10 @@ export const FallenStocksWidget = () => {
     })) : [];
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+    <div className={`h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden ${justLoaded ? 'widget-loaded' : ''}`}>
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
         <div className="flex items-center gap-1">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Stocks Down A Lot</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Stocks Down A Lot</span>
           <span className="text-xs bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-neonGreen animate-pulse"></span> Live
           </span>
@@ -802,7 +810,7 @@ export const AIInsightsWidget = () => {
   };
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fadeInUp {
           from {
@@ -821,7 +829,7 @@ export const AIInsightsWidget = () => {
       `}} />
 
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">AI Insights</span>
+        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">AI Insights</span>
         <span className="text-xs text-neonAmber font-bold">ALERT</span>
       </div>
 
@@ -946,10 +954,10 @@ export const NewsSentinelWidget = () => {
   };
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden font-mono text-[10px]">
+    <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col hover:border-gray-600 transition-colors overflow-hidden font-mono text-[10px]">
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">News Sentinel</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">News Sentinel</span>
           <span className="text-[8px] bg-neonGreen/10 text-neonGreen border border-neonGreen/20 px-1 py-0.2 rounded font-bold uppercase shrink-0 animate-pulse">LIVE</span>
         </div>
       </div>
@@ -1010,6 +1018,14 @@ export const FinancialSummaryWidget = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [justLoaded, setJustLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      setJustLoaded(true);
+      setTimeout(() => setJustLoaded(false), 700);
+    }
+  }, [loading]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -1065,9 +1081,9 @@ export const FinancialSummaryWidget = () => {
 
   if (loading) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Financials</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Financials</span>
         </div>
         <WidgetSkeleton rows={5} />
       </div>
@@ -1076,9 +1092,9 @@ export const FinancialSummaryWidget = () => {
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Financials</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Financials</span>
         </div>
         <WidgetError message={error} onRetry={fetchData} />
       </div>
@@ -1086,11 +1102,11 @@ export const FinancialSummaryWidget = () => {
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
+    <div className={`h-full bg-surface border border-gray-800 widget-card flex flex-col hover:border-gray-600 transition-colors overflow-hidden ${justLoaded ? 'widget-loaded' : ''}`}>
       {/* Header with Search */}
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold shrink-0">Financials</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title shrink-0">Financials</span>
           <span className="text-xs text-white font-bold truncate max-w-[60px]">{activeSymbol}</span>
           {fund?.sector && (
             <span className="text-[8px] bg-gray-850 text-gray-400 border border-gray-800 px-1 py-0.2 rounded uppercase truncate max-w-[80px]" title={fund.sector}>
@@ -1399,9 +1415,9 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
 
   if (loading) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Risk Meter</span>
         </div>
         <WidgetSkeleton rows={4} />
       </div>
@@ -1410,9 +1426,9 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Risk Meter</span>
         </div>
         <WidgetError message={error} onRetry={fetchRiskData} />
       </div>
@@ -1420,10 +1436,10 @@ export const RiskMeterWidget = ({ symbol: defaultSymbol = "RELIANCE" }: { symbol
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col hover:border-gray-600 transition-colors overflow-hidden">
       {/* Header with Search */}
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
-        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Risk Meter</span>
+        <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">Risk Meter</span>
         <form onSubmit={handleSearch} className="flex items-center gap-1">
           <input
             type="text"
@@ -1626,9 +1642,9 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
 
   if (loading && results.length === 0) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">{tabName} Screener</span>
         </div>
         <WidgetSkeleton rows={4} />
       </div>
@@ -1637,9 +1653,9 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
 
   if (error) {
     return (
-      <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden font-mono text-[10px]">
+      <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden font-mono text-[10px]">
         <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">{tabName} Screener</span>
         </div>
         <WidgetError message={error} onRetry={() => fetchData(false)} />
       </div>
@@ -1647,11 +1663,11 @@ export const ScreenerMetricWidget = ({ tabName }: { tabName: string }) => {
   }
 
   return (
-    <div className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+    <div className="h-full bg-surface border border-gray-800 widget-card flex flex-col overflow-hidden">
       {/* Title Header */}
       <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none font-mono">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">{tabName} Screener</span>
+          <span className="text-xs uppercase tracking-widest text-gray-500 font-bold widget-title">{tabName} Screener</span>
           {lastUpdated && <StaleDataBadge lastUpdatedAt={lastUpdated} />}
         </div>
         <span className="text-[8px] px-1 py-0.2 rounded bg-neonAmber/15 text-neonAmber border border-neonAmber/20 font-bold uppercase tracking-wider shrink-0 select-none">DATA</span>

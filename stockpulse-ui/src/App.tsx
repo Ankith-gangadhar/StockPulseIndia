@@ -21,6 +21,8 @@ import {
 } from './components/Widgets';
 import { FIIDIIWidget } from './components/widgets/FIIDIIWidget';
 import MarketStatusBar from './components/MarketStatusBar';
+import MarketStateOverlay from './components/MarketStateOverlay';
+import { getMarketStatus } from './services/stockApi';
 
 const defaultLayout = [
   { i: 'quotes', x: 0, y: 0, w: 1, h: 2, minW: 1, minH: 1 },
@@ -78,7 +80,13 @@ function App() {
   
   const [layout, setLayout] = useState(defaultLayout);
   const { width, containerRef, mounted } = useContainerWidth();
+  const [marketOpen, setMarketOpen] = useState<boolean | null>(null);
 
+  useEffect(() => {
+    getMarketStatus().then(s => { if (s) setMarketOpen(s.isOpen); });
+    const iv = setInterval(() => getMarketStatus().then(s => { if (s) setMarketOpen(s.isOpen); }), 60000);
+    return () => clearInterval(iv);
+  }, []);
 
 
   useEffect(() => {
@@ -208,11 +216,12 @@ function App() {
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-background font-mono text-gray-200">
+    <div ref={containerRef} className={`min-h-screen bg-background font-mono text-gray-200 scan-sweep ${marketOpen === false ? 'market-closed-dim' : 'market-open-bright'}`}>
+      <MarketStateOverlay />
       <header className="flex justify-between items-center px-6 py-3 border-b border-gray-800 bg-surface">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-neonGreen animate-pulse" />
-          <h1 className="text-lg font-bold tracking-widest text-white">
+          <h1 className="text-lg font-bold tracking-widest text-white neon-text">
             STOCK<span className="text-neonAmber">PULSE</span> <span className="text-gray-500">ANKITH</span>
           </h1>
         </div>
@@ -231,8 +240,9 @@ function App() {
       {mounted && (() => {
         const Grid = ResponsiveGridLayout as any;
         return (
+          <div className="grid-bg relative">
           <Grid
-            className="layout"
+            className="layout relative z-10"
             width={width}
             layouts={{ lg: layout }}
             breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
@@ -249,7 +259,7 @@ function App() {
             <div key="screener-GROWTH" className="h-full"><ScreenerMetricWidget tabName="GROWTH" /></div>
             <div key="screener-TECH" className="h-full"><ScreenerMetricWidget tabName="TECH" /></div>
 
-            <div key="chart" className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden">
+            <div key="chart" className="h-full bg-surface border border-gray-800 flex flex-col overflow-hidden widget-card">
               <div className="drag-handle cursor-move flex justify-between items-center px-1.5 py-0.5 border-b border-gray-800 bg-gray-900/60 select-none">
                 <span className="text-xs uppercase tracking-widest text-gray-500 font-bold">Chart Station</span>
                 <span className="text-xs text-gray-600">{chartTabs.length}/{MAX_CHARTS} charts</span>
@@ -349,6 +359,7 @@ function App() {
             <div key="risk" className="h-full"><RiskMeterWidget /></div>
             <div key="fiidii" className="h-full"><FIIDIIWidget /></div>
           </Grid>
+          </div>
         );
       })()}
       <Analytics />
